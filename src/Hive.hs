@@ -19,29 +19,64 @@ import Data.DeriveTH
 import Data.Set as Set
 
 type QueenSearchReply = Maybe ProcessId
-type Queen = ProcessId
-type Drone = ProcessId
+type Queen     = ProcessId
+type Drone     = ProcessId
+type Requester = ProcessId
+type Scheduler = ProcessId
 
-data RegisterMsg = Register { dronePid :: Drone }
+type Problem = String
+
+data QueenMsg = Register { dronePid  :: Drone     }
+              | Solve    { problem   :: Problem
+                         , requester :: Requester }
   deriving (Generic, Typeable, Show)
 
-data QueenState = QueenState { drones :: Set Drone }
+data DroneMsg = Registered { schedulerPid :: Scheduler }
+  deriving (Generic, Typeable, Show)
 
-$(derive makeBinary ''RegisterMsg)
+data QueenState = QueenState { scheduler :: Scheduler
+                             , drones    :: Set Drone
+                             }
+  deriving (Show)
 
-remotable []
+data DroneState = DroneState { queen      :: Queen
+                             , scheduler_ :: Scheduler
+                             }
+  deriving (Show)
+
+$(derive makeBinary ''QueenMsg)
+$(derive makeBinary ''DroneMsg)
 
 
-mkRegisterMsg :: Drone -> RegisterMsg
+mkQueenState :: Scheduler -> Set Drone -> QueenState
+mkQueenState scheduler drones = QueenState scheduler drones
+
+mkDroneState :: Queen -> Scheduler -> DroneState
+mkDroneState queen scheduler = DroneState queen scheduler
+
+mkRegisterMsg :: Drone -> QueenMsg
 mkRegisterMsg pid = Register { dronePid = pid }
+
+mkRegisteredMsg :: Scheduler -> DroneMsg
+mkRegisteredMsg pid = Registered { schedulerPid = pid }
+
+
+startScheduler :: Queen -> Process ()
+startScheduler queenPid = do
+  -- build function chain
+  -- dispatch to drones -> spawn processes
+  -- reply to requester
+  say "Solving... dummy..."
+  return ()
 
 
 searchQueen :: Backend -> Process QueenSearchReply
 searchQueen backend =
-  searchQueen' =<< liftIO (findPeers backend 2000)
+  searchQueen' =<< liftIO (findPeers backend 1000000)
     where
       searchQueen' :: [NodeId] -> Process QueenSearchReply
       searchQueen' (peer:ps) = do
+        liftIO . putStrLn $ show peer
         whereisRemoteAsync peer "queen"
         WhereIsReply _name remoteWhereIs <- expect
         case remoteWhereIs of
@@ -54,14 +89,18 @@ startQueen :: Backend -> Process ()
 startQueen backend = do
   queenPid <- getSelfPid
   register "queen" queenPid
-  say "Starting Queen..." >> serverLoop queenPid (QueenState { drones = empty})
+  say "Starting Queen..." 
+  schedulerPid <- spawnLocal $ startScheduler queenPid
+  serverLoop queenPid (mkQueenState schedulerPid empty)
     where
       serverLoop :: Queen -> QueenState -> Process ()
       serverLoop queenPid state = do
         liftIO . putStrLn $ "Registered drones: " ++ (show . size $ drones state)
-        receiveWait [ match (\(Register { dronePid = pid} ) -> do
+        receiveWait [ match (\(Register { dronePid = pid }) -> do
                         say $ "Drone registered at " ++ show pid
-                        serverLoop queenPid (state {drones = pid `insert` drones state}))
+                        send pid $ mkRegisteredMsg (scheduler state)
+                        serverLoop queenPid (state {drones = pid `insert` drones state})
+                      )
                     , matchUnknown $ do 
                         say "Unknown message received. Discarding..."
                         serverLoop queenPid state
@@ -75,9 +114,24 @@ startDrone backend = do
   case queen of
     Just queenPid -> do
       link queenPid
-      liftIO . putStrLn $ "Queen found at " ++ show queenPid
       send queenPid $ mkRegisterMsg dronePid
-    Nothing -> liftIO . putStrLn $ "No Queen found..."
+      receiveWait [ match (\(Registered { schedulerPid = scheduler }) -> do
+                    liftIO . putStrLn $ "Starting Drone..."
+                    liftIO . putStrLn $ "Queen: " ++ show queenPid ++ ", Scheduler: " ++ show scheduler
+                    droneLoop $ mkDroneState queenPid scheduler
+                    )
+                  ]
+    Nothing -> liftIO . putStrLn $ "No Queen found... terminating..."
+  where
+    droneLoop :: DroneState -> Process ()
+    droneLoop state = do
+      return ()
+      --receiveWait [ match (\(Registered { schedulerPid = scheduler }) -> do
+      --              )
+      --            ]
+
+
+remotable []
 
 
 main :: IO ()
