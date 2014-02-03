@@ -19,53 +19,44 @@ import Data.DeriveTH
 import Data.Set as Set
 
 type QueenSearchReply = Maybe ProcessId
+
 type Queen     = ProcessId
 type Drone     = ProcessId
-type Requester = ProcessId
+type Client    = ProcessId
 type Scheduler = ProcessId
 
-type Problem = String
+type Problem  = String
+type Solution = String
 
-data QueenMsg = Register { dronePid  :: Drone     }
-              | Solve    { problem   :: Problem
-                         , requester :: Requester }
+data QueenMsg = Register Drone
+              | Solve    Problem Client
   deriving (Generic, Typeable, Show)
 
-data DroneMsg = Registered { schedulerPid :: Scheduler }
+data DroneMsg = Registered Scheduler
+              | Work       Problem
   deriving (Generic, Typeable, Show)
 
-data QueenState = QueenState { scheduler :: Scheduler
-                             , drones    :: Set Drone
-                             }
+data SchedulerMsg = WorkRequest Drone
+                  | WorkReply   Solution
+                  | Enqueue     Problem  Client
+  deriving (Generic, Typeable, Show)
+
+data QueenState = QueenState Queen Scheduler (Set Drone)
   deriving (Show)
 
-data DroneState = DroneState { queen      :: Queen
-                             , scheduler_ :: Scheduler
-                             }
+data DroneState = DroneState Queen Scheduler
   deriving (Show)
 
 $(derive makeBinary ''QueenMsg)
 $(derive makeBinary ''DroneMsg)
-
-
-mkQueenState :: Scheduler -> Set Drone -> QueenState
-mkQueenState scheduler drones = QueenState scheduler drones
-
-mkDroneState :: Queen -> Scheduler -> DroneState
-mkDroneState queen scheduler = DroneState queen scheduler
-
-mkRegisterMsg :: Drone -> QueenMsg
-mkRegisterMsg pid = Register { dronePid = pid }
-
-mkRegisteredMsg :: Scheduler -> DroneMsg
-mkRegisteredMsg pid = Registered { schedulerPid = pid }
+$(derive makeBinary ''SchedulerMsg)
 
 
 startScheduler :: Queen -> Process ()
 startScheduler queenPid = do
+  
   -- build function chain
   -- dispatch to drones -> spawn processes
-  -- reply to requester
   say "Solving... dummy..."
   return ()
 
@@ -87,23 +78,26 @@ searchQueen backend =
 
 startQueen :: Backend -> Process ()
 startQueen backend = do
-  queenPid <- getSelfPid
-  register "queen" queenPid
+  queen <- getSelfPid
+  register "queen" queen
   say "Starting Queen..." 
-  schedulerPid <- spawnLocal $ startScheduler queenPid
-  serverLoop queenPid (mkQueenState schedulerPid empty)
+  scheduler <- spawnLocal $ startScheduler queen
+  serverLoop (QueenState queen scheduler empty)
     where
-      serverLoop :: Queen -> QueenState -> Process ()
-      serverLoop queenPid state = do
-        liftIO . putStrLn $ "Registered drones: " ++ (show . size $ drones state)
-        receiveWait [ match (\(Register { dronePid = pid }) -> do
-                        say $ "Drone registered at " ++ show pid
-                        send pid $ mkRegisteredMsg (scheduler state)
-                        serverLoop queenPid (state {drones = pid `insert` drones state})
+      serverLoop :: QueenState -> Process ()
+      serverLoop state@(QueenState queen scheduler drones) = do
+        receiveWait [ match (\(Register drone) -> do
+                        say $ "Drone registered at " ++ show drone
+                        send drone $ Registered scheduler
+                        serverLoop $ QueenState queen scheduler (drone `insert` drones)
+                      )
+                    , match (\(Solve problem client) -> do
+                        send scheduler $ Enqueue problem client
+                        serverLoop state
                       )
                     , matchUnknown $ do 
                         say "Unknown message received. Discarding..."
-                        serverLoop queenPid state
+                        serverLoop state
                     ]
 
 
@@ -114,21 +108,27 @@ startDrone backend = do
   case queen of
     Just queenPid -> do
       link queenPid
-      send queenPid $ mkRegisterMsg dronePid
-      receiveWait [ match (\(Registered { schedulerPid = scheduler }) -> do
+      send queenPid $ Register dronePid
+      receiveWait [ match (\(Registered scheduler) -> do
                     liftIO . putStrLn $ "Starting Drone..."
                     liftIO . putStrLn $ "Queen: " ++ show queenPid ++ ", Scheduler: " ++ show scheduler
-                    droneLoop $ mkDroneState queenPid scheduler
+                    droneLoop $ DroneState queenPid scheduler
                     )
                   ]
     Nothing -> liftIO . putStrLn $ "No Queen found... terminating..."
   where
     droneLoop :: DroneState -> Process ()
-    droneLoop state = do
-      return ()
-      --receiveWait [ match (\(Registered { schedulerPid = scheduler }) -> do
-      --              )
-      --            ]
+    droneLoop (DroneState queen scheduler) = do
+      dronePid <- getSelfPid
+      send scheduler $ WorkRequest dronePid
+      receiveWait [ match (\(Work problem) -> do
+                      send scheduler $ WorkReply $ solve problem
+
+                    )
+                  ]
+
+    solve :: Problem -> Solution
+    solve = id
 
 
 remotable []
