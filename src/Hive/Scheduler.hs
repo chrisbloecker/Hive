@@ -1,5 +1,6 @@
 module Hive.Scheduler
-  where
+  ( startScheduler
+  ) where
 
 import Control.Distributed.Process
 
@@ -17,18 +18,17 @@ startScheduler queenPid loggerPid = do
     where
       schedulerLoop :: SchedulerState -> Process ()
       schedulerLoop state@(SchedulerState queen logger queue) = do
-        receiveWait [ match (\(QEnqueProblemS (ClientRequest client _problemType problemInstance)) -> do
+        receiveWait [ match $ \(QEnqueProblemS (ClientRequest client _problemType problemInstance)) -> do
                         say "Enqueueing problem..."
                         schedulerLoop $ SchedulerState queen logger (queue |> (problemInstance, client))
-                      )
-                    , match (\(DWorkFinishedS solution client) -> do
+                    
+                    , match $ \(DWorkFinishedS solution client) -> do
                         say "Solution found, sending to client..."
                         send client $ SSolutionC solution
                         schedulerLoop state
-                      )
-                    , matchIf (\_ -> not . Sequence.null $ queue) (\(DWorkRequestS drone) -> do
+                    
+                    , matchIf (\_ -> not . Sequence.null $ queue) $ \(DWorkRequestS drone) -> do
                         say $ "Work request from " ++ show drone
                         send drone $ SWorkReplyD (queue `Sequence.index` 0)
                         schedulerLoop $ SchedulerState queen logger (Sequence.drop 1 queue)
-                      )
                     ]

@@ -55,5 +55,3 @@ $(derive makeBinary ''SWorkReplyD)
 $(derive makeBinary ''QRegisteredD)
 $(derive makeBinary ''QWorkD)
 $(derive makeBinary ''QEnqueProblemS)
-
-data DroneState     = DroneState     Queen Scheduler Logger                                      deriving (Show)

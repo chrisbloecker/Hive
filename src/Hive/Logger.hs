@@ -1,5 +1,6 @@
 module Hive.Logger
-  where
+  ( startLogger
+  ) where
 
 import Control.Distributed.Process
 
