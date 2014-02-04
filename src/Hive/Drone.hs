@@ -19,20 +19,9 @@ startDrone backend = do
     Just queen -> do
       send queen $ DRegisterAtQ dronePid
       QRegisteredD scheduler logger <- expect
-      say $ "Queen     at " ++ show queen
-      say $ "Logger    at " ++ show logger
-      say $ "Scheduler at " ++ show scheduler
       link queen
+      redirectLogsHere backend [queen]
       droneLoop $ DroneState queen scheduler logger
-
-      --receiveWait [ match (\(QRegisteredD scheduler logger) -> do
-      --                liftIO . putStrLn $ "Queen     at " ++ show queen
-      --                liftIO . putStrLn $ "Logger    at " ++ show logger
-      --                liftIO . putStrLn $ "Scheduler at " ++ show scheduler
-      --                link queen
-      --                droneLoop $ DroneState queen scheduler logger
-      --              )
-      --            ]
     Nothing -> liftIO . putStrLn $ "No Queen found... Terminating..."
   where
     droneLoop :: DroneState -> Process ()
