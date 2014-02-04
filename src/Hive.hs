@@ -27,26 +27,33 @@ type Client    = ProcessId
 type Scheduler = ProcessId
 type Logger    = ProcessId
 
+
 type Problem  = String
 type Solution = String
 
+data ProblemType   = TSP                                       deriving (Generic, Typeable, Show)
+data ClientRequest = ClientRequest Client ProblemType Problem  deriving (Generic, Typeable, Show)
+
 -- messages from drones
-data DRegisterAtQ   = DRegisterAtQ Drone             deriving (Generic, Typeable, Show)
-data DWorkRequestS  = DWorkRequestS Drone            deriving (Generic, Typeable, Show)
-data DWorkFinishedS = DWorkFinishedS Solution        deriving (Generic, Typeable, Show)
+data DRegisterAtQ   = DRegisterAtQ Drone                       deriving (Generic, Typeable, Show)
+data DWorkRequestS  = DWorkRequestS Drone                      deriving (Generic, Typeable, Show)
+data DWorkFinishedS = DWorkFinishedS Solution Client           deriving (Generic, Typeable, Show)
 
 -- messages from clients
-data CSolveProblemQ = CSolveProblemQ Problem Client  deriving (Generic, Typeable, Show)
+data CSolveProblemQ = CSolveProblemQ ClientRequest             deriving (Generic, Typeable, Show)
 
 -- messages from scheduler
-data SSolutionC     = SSolutionC Solution            deriving (Generic, Typeable, Show)
-data SWorkReplyD    = SWorkReplyD Problem            deriving (Generic, Typeable, Show)
+data SSolutionC     = SSolutionC Solution                      deriving (Generic, Typeable, Show)
+data SWorkReplyD    = SWorkReplyD (Problem, Client)            deriving (Generic, Typeable, Show)
 
 -- messages from queen
-data QRegisteredD   = QRegisteredD Scheduler Logger  deriving (Generic, Typeable, Show)
-data QWorkD         = QWorkD Problem                 deriving (Generic, Typeable, Show)
-data QEnqueProblemS = QEnqueProblemS Problem Client  deriving (Generic, Typeable, Show)
+data QRegisteredD   = QRegisteredD Scheduler Logger            deriving (Generic, Typeable, Show)
+data QWorkD         = QWorkD Problem                           deriving (Generic, Typeable, Show)
+data QEnqueProblemS = QEnqueProblemS ClientRequest             deriving (Generic, Typeable, Show)
 
+
+$(derive makeBinary ''ProblemType)
+$(derive makeBinary ''ClientRequest)
 
 $(derive makeBinary ''DRegisterAtQ)
 $(derive makeBinary ''DWorkRequestS)
@@ -65,8 +72,8 @@ data SchedulerState = SchedulerState Queen           Logger             (Seq (Pr
 
 
 startLogger :: Queen -> Process ()
-startLogger queen = do
-  link queen
+startLogger queenPid = do
+  link queenPid
   return ()
 
 
@@ -77,16 +84,20 @@ startScheduler queenPid loggerPid = do
     where
       schedulerLoop :: SchedulerState -> Process ()
       schedulerLoop state@(SchedulerState queen logger queue) = do
-        receiveWait [ match (\(QEnqueProblemS problem client) -> do
-                        schedulerLoop $ SchedulerState queen logger (queue |> (problem, client))
+        receiveWait [ match (\(QEnqueProblemS (ClientRequest client _problemType problemInstance)) -> do
+                        say "Enqueueing problem..."
+                        schedulerLoop $ SchedulerState queen logger (queue |> (problemInstance, client))
+                      )
+                    , match (\(DWorkFinishedS solution client) -> do
+                        say "Solution found, sending to client..."
+                        send client $ SSolutionC solution
+                        schedulerLoop state
                       )
                     , matchIf (\_ -> not . Sequence.null $ queue) (\(DWorkRequestS drone) -> do
-                        send drone $  (fst $ queue `Sequence.index` 0)
+                        say $ "Work request from " ++ show drone
+                        send drone $ SWorkReplyD (queue `Sequence.index` 0)
                         schedulerLoop $ SchedulerState queen logger (Sequence.drop 1 queue)
                       )
-                    , matchUnknown $ do
-                        say "Unknown message received. Discarding..."
-                        schedulerLoop state
                     ]
 
 
@@ -122,10 +133,9 @@ startQueen _backend = do
                         send drone $ QRegisteredD scheduler logger
                         serverLoop $ QueenState scheduler logger (drone `insert` drones)
                       )
-                    , match (\(CSolveProblemQ problem client) -> do
-                        say $ "Solve request from " ++ show client
-                        say $ show problem
-                        send scheduler $ QEnqueProblemS problem client
+                    , match (\(CSolveProblemQ problem) -> do
+                        say $ "Solve request: " ++ show problem
+                        send scheduler $ QEnqueProblemS problem
                         serverLoop state
                       )
                     , matchUnknown $ do 
@@ -155,8 +165,9 @@ startDrone backend = do
     droneLoop state@(DroneState _queen scheduler _logger) = do
       dronePid <- getSelfPid
       send scheduler $ DWorkRequestS dronePid
-      receiveWait [ match (\(SWorkReplyD problem) -> do
-                      send scheduler $ DWorkFinishedS $ solve problem
+      receiveWait [ match (\(SWorkReplyD (problem, client)) -> do
+                      say "Got work..."
+                      send scheduler $ DWorkFinishedS (solve problem) client
                       droneLoop state
                     )
                   , matchUnknown $ do
@@ -175,7 +186,7 @@ startClient backend problem = do
   case queenPid of
     Just queen -> do
       liftIO . putStrLn $ "Queen found at " ++ show queen
-      send queen $ CSolveProblemQ problem clientPid
+      send queen $ CSolveProblemQ $ ClientRequest clientPid TSP problem
       receiveWait [ match (\(SSolutionC solution) -> do
                       liftIO . putStrLn $ "Solution: " ++ show solution
                     )
