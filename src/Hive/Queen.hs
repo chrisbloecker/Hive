@@ -1,4 +1,6 @@
-module Hive.Queen 
+{-# LANGUAGE ScopedTypeVariables #-}
+
+module Hive.Queen
   ( startQueen
   , searchQueen
   ) where
@@ -39,7 +41,7 @@ startQueen backend = do
                         say $ "Solve request: " ++ show problem
                         send scheduler $ QEnqueProblemS problem
                         serverLoop state
-                    
+
                     , matchUnknown $ do 
                         say "Unknown message received. Discarding..."
                         serverLoop state
