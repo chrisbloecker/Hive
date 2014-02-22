@@ -1,0 +1,3 @@
+module Hive.Client
+  where
+
