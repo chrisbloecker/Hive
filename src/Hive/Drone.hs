@@ -6,7 +6,7 @@ import Control.Distributed.Process
 import Control.Distributed.Process.Backend.SimpleLocalnet
 
 import Hive.Data
-import Hive.Queen
+import Hive.Client
 
 data DroneState = DroneState Queen Scheduler Logger
   deriving (Show)
@@ -20,8 +20,6 @@ startDrone backend = do
       send queen $ DRegisterAtQ dronePid
       QRegisteredD scheduler logger <- expect
       link queen
-      --redirectLogsHere backend [queen]
-      --say "Logs redirected."
       droneLoop $ DroneState queen scheduler logger
     Nothing -> liftIO . putStrLn $ "No Queen found... Terminating..."
   where

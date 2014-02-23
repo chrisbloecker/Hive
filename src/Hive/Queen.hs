@@ -2,7 +2,6 @@
 
 module Hive.Queen
   ( startQueen
-  , searchQueen
   ) where
 
 import Control.Distributed.Process
@@ -20,7 +19,7 @@ data QueenState = QueenState Scheduler Logger (Set Drone)
 
 
 startQueen :: Backend -> Process ()
-startQueen backend = do
+startQueen _backend = do
   queen     <- getSelfPid
   register "queen" queen
   logger    <- spawnLocal $ startLogger queen
@@ -31,7 +30,7 @@ startQueen backend = do
   serverLoop $ QueenState scheduler logger Set.empty
     where
       serverLoop :: QueenState -> Process ()
-      serverLoop state@(QueenState scheduler logger drones) = do
+      serverLoop state@(QueenState scheduler logger drones) =
         receiveWait [ match $ \(DRegisterAtQ drone) -> do
                         say $ "Drone registered at " ++ show drone
                         send drone $ QRegisteredD scheduler logger
@@ -46,16 +45,3 @@ startQueen backend = do
                         say "Unknown message received. Discarding..."
                         serverLoop state
                     ]
-
-searchQueen :: Backend -> Process QueenSearchReply
-searchQueen backend =
-  searchQueen' =<< liftIO (findPeers backend 1000000)
-    where
-      searchQueen' :: [NodeId] -> Process QueenSearchReply
-      searchQueen' (peer:ps) = do
-        whereisRemoteAsync peer "queen"
-        WhereIsReply _name remoteWhereIs <- expect
-        case remoteWhereIs of
-          Just queenPid -> return (Just queenPid)
-          Nothing       -> searchQueen' ps
-      searchQueen' [] = return Nothing

@@ -13,6 +13,7 @@ import Control.Distributed.Process.Node hiding (newLocalNode)
 import Hive.Data
 import Hive.Queen
 import Hive.Drone
+import Hive.Client
 
 
 startClient :: Backend -> Problem -> Process ()
