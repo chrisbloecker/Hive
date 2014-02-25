@@ -2,15 +2,31 @@ module Hive.Scheduler
   ( startScheduler
   ) where
 
+-------------------------------------------------------------------------------
+
 import Control.Distributed.Process
 
 import Data.Sequence as Sequence
 
-import Hive.Types
-import Hive.Messages
+import Hive.Types    ( Queen
+                     , Logger
+                     , Problem
+                     , Client
+                     , ClientRequest(ClientRequest)
+                     )
+import Hive.Messages ( QEnqueProblemS(QEnqueProblemS)
+                     , DWorkRequestS(DWorkRequestS)
+                     , DWorkDoneS(DWorkDoneS)
+                     , SSolutionC(SSolutionC)
+                     , SWorkReplyD(SWorkReplyD)
+                     )
+
+-------------------------------------------------------------------------------
 
 data SchedulerState = SchedulerState Queen Logger (Seq (Problem, Client))
   deriving (Show)
+
+-------------------------------------------------------------------------------
 
 startScheduler :: Queen -> Logger -> Process ()
 startScheduler queenPid loggerPid = do
@@ -19,11 +35,11 @@ startScheduler queenPid loggerPid = do
     where
       schedulerLoop :: SchedulerState -> Process ()
       schedulerLoop state@(SchedulerState queen logger queue) =
-        receiveWait [ match $ \(QEnqueProblemS (ClientRequest client _problemType problemInstance)) -> do
+        receiveWait [ match $ \(QEnqueProblemS (ClientRequest client problem)) -> do
                         say "Enqueueing problem..."
-                        schedulerLoop $ SchedulerState queen logger (queue |> (problemInstance, client))
+                        schedulerLoop $ SchedulerState queen logger (queue |> (problem, client))
                     
-                    , match $ \(DWorkFinishedS solution client) -> do
+                    , match $ \(DWorkDoneS solution client) -> do
                         say "Solution found, sending to client..."
                         send client $ SSolutionC solution
                         schedulerLoop state

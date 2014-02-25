@@ -54,7 +54,7 @@ startQueen _backend = do
                         say $ "Drone registered at " ++ show drone
                         send drone $ QRegisteredD scheduler logger
                         serverLoop $ QueenState scheduler logger (drone `insert` drones)
-                    
+
                     , match $ \(CSolveProblemQ problem) -> do
                         say $ "Solve request: " ++ show problem
                         send scheduler $ QEnqueProblemS problem

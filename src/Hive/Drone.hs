@@ -2,14 +2,32 @@ module Hive.Drone
   ( startDrone
   ) where
 
+-------------------------------------------------------------------------------
+
 import Control.Distributed.Process
 import Control.Distributed.Process.Backend.SimpleLocalnet
 
-import Hive.Data
-import Hive.Client
+import Hive.Types    ( Queen
+                     , Scheduler
+                     , Logger
+                     , Problem(Problem)
+                     , Solution(Solution)
+                     , Instance(unInstance)
+                     )
+import Hive.Messages ( QRegisteredD(QRegisteredD)
+                     , DRegisterAtQ(DRegisterAtQ)
+                     , SWorkReplyD(SWorkReplyD)
+                     , DWorkDoneS(DWorkDoneS)
+                     , DWorkRequestS(DWorkRequestS)
+                     )
+import Hive.Queen    (searchQueen)
+
+-------------------------------------------------------------------------------
 
 data DroneState = DroneState Queen Scheduler Logger
   deriving (Show)
+
+-------------------------------------------------------------------------------
 
 startDrone :: Backend -> Process ()
 startDrone backend = do
@@ -29,7 +47,7 @@ startDrone backend = do
       send scheduler $ DWorkRequestS dronePid
       receiveWait [ match $ \(SWorkReplyD (problem, client)) -> do
                       say "Got work..."
-                      send scheduler $ DWorkFinishedS (solve problem) client
+                      send scheduler $ DWorkDoneS (solve problem) client
                       droneLoop state
                   
                   , matchUnknown $ do
@@ -38,4 +56,4 @@ startDrone backend = do
                   ]
 
     solve :: Problem -> Solution
-    solve = id
+    solve (Problem _type inst) = Solution $ unInstance inst

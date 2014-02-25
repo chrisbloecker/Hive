@@ -28,6 +28,7 @@ library
   if impl(ghc < 7.6)
     build-depends: ghc-prim
   exposed-modules:     Hive.Queen
+                       Hive.Drone
                        Hive.Logger
                        Hive.Scheduler
                        Hive.Client

@@ -1,7 +1,32 @@
 {-# LANGUAGE TemplateHaskell, DeriveGeneric, DeriveDataTypeable #-}
 
 module Hive.Messages
-  where
+  (
+-- debug messages
+    IntMsg(IntMsg)
+  , ChrMsg(ChrMsg)
+  , StrMsg(StrMsg)
+  , TxtMsg(TxtMsg)
+
+-- messages from drones
+  , DRegisterAtQ(DRegisterAtQ)
+  , DWorkRequestS(DWorkRequestS)
+  , DWorkDoneS(DWorkDoneS)
+
+-- messages from clients
+  , CSolveProblemQ(CSolveProblemQ)
+
+-- messages from scheduler
+  , SSolutionC(SSolutionC)
+  , SWorkReplyD(SWorkReplyD)
+
+-- messages from queen
+  , QRegisteredD(QRegisteredD)
+  , QWorkD(QWorkD)
+  , QEnqueProblemS(QEnqueProblemS)
+  ) where
+
+-------------------------------------------------------------------------------
 
 import Data.Binary      (Binary, put, get)
 import Data.Typeable    (Typeable)
@@ -12,16 +37,18 @@ import GHC.Generics     (Generic)
 
 import Hive.Types
 
--- messages for debugging
-data IntMsg         = IntMsg { unIntMsg :: Int    }            deriving (Generic, Typeable, Show)
-data ChrMsg         = ChrMsg { unChrMsg :: Char   }            deriving (Generic, Typeable, Show)
-data StrMsg         = StrMsg { unStrMgs :: String }            deriving (Generic, Typeable, Show)
-data TxtMsg         = TxtMsg { unTxtMsg :: Text   }            deriving (Generic, Typeable, Show)
+-------------------------------------------------------------------------------
+
+-- debug messages
+data IntMsg         = IntMsg Int                               deriving (Generic, Typeable, Show)
+data ChrMsg         = ChrMsg Char                              deriving (Generic, Typeable, Show)
+data StrMsg         = StrMsg String                            deriving (Generic, Typeable, Show)
+data TxtMsg         = TxtMsg Text                              deriving (Generic, Typeable, Show)
 
 -- messages from drones
 data DRegisterAtQ   = DRegisterAtQ Drone                       deriving (Generic, Typeable, Show)
 data DWorkRequestS  = DWorkRequestS Drone                      deriving (Generic, Typeable, Show)
-data DWorkFinishedS = DWorkFinishedS Solution Client           deriving (Generic, Typeable, Show)
+data DWorkDoneS     = DWorkDoneS Solution Client               deriving (Generic, Typeable, Show)
 
 -- messages from clients
 data CSolveProblemQ = CSolveProblemQ ClientRequest             deriving (Generic, Typeable, Show)
@@ -35,6 +62,7 @@ data QRegisteredD   = QRegisteredD Scheduler Logger            deriving (Generic
 data QWorkD         = QWorkD Problem                           deriving (Generic, Typeable, Show)
 data QEnqueProblemS = QEnqueProblemS ClientRequest             deriving (Generic, Typeable, Show)
 
+-------------------------------------------------------------------------------
 
 $(derive makeBinary ''IntMsg)
 $(derive makeBinary ''ChrMsg)
@@ -43,7 +71,7 @@ $(derive makeBinary ''TxtMsg)
 
 $(derive makeBinary ''DRegisterAtQ)
 $(derive makeBinary ''DWorkRequestS)
-$(derive makeBinary ''DWorkFinishedS)
+$(derive makeBinary ''DWorkDoneS)
 $(derive makeBinary ''CSolveProblemQ)
 $(derive makeBinary ''SSolutionC)
 $(derive makeBinary ''SWorkReplyD)
