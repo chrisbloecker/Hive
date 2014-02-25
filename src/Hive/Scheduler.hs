@@ -6,7 +6,8 @@ import Control.Distributed.Process
 
 import Data.Sequence as Sequence
 
-import Hive.Data
+import Hive.Types
+import Hive.Messages
 
 data SchedulerState = SchedulerState Queen Logger (Seq (Problem, Client))
   deriving (Show)
@@ -17,7 +18,7 @@ startScheduler queenPid loggerPid = do
   schedulerLoop $ SchedulerState queenPid loggerPid Sequence.empty
     where
       schedulerLoop :: SchedulerState -> Process ()
-      schedulerLoop state@(SchedulerState queen logger queue) = do
+      schedulerLoop state@(SchedulerState queen logger queue) =
         receiveWait [ match $ \(QEnqueProblemS (ClientRequest client _problemType problemInstance)) -> do
                         say "Enqueueing problem..."
                         schedulerLoop $ SchedulerState queen logger (queue |> (problemInstance, client))

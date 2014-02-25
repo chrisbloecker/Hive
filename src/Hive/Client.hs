@@ -7,7 +7,8 @@ import Control.Distributed.Process.Backend.SimpleLocalnet
 
 import Control.Concurrent.MVar
 
-import Hive.Data
+import Hive.Types
+import Hive.Messages
 import Hive.Queen
 
 import Data.Text

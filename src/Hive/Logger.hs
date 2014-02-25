@@ -4,7 +4,7 @@ module Hive.Logger
 
 import Control.Distributed.Process
 
-import Hive.Data
+import Hive.Types
 
 startLogger :: Queen -> Process ()
 startLogger queenPid = do

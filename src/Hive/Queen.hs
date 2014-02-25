@@ -11,7 +11,8 @@ import Control.Distributed.Process.Backend.SimpleLocalnet
 import Data.Text (unpack)
 import Data.Set as Set
 
-import Hive.Data
+import Hive.Types
+import Hive.Messages
 import Hive.Logger
 import Hive.Scheduler
 
