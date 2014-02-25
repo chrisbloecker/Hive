@@ -1,29 +1,22 @@
 {-# LANGUAGE TemplateHaskell, DeriveGeneric, DeriveDataTypeable #-}
 
-module Hive.Data
+module Hive.Messages
   where
 
-import Control.Distributed.Process
+import Data.Binary      (Binary, put, get)
+import Data.Typeable    (Typeable)
+import Data.Text        (Text)
+import Data.Text.Binary ()
+import Data.DeriveTH    (derive, makeBinary)
+import GHC.Generics     (Generic)
 
-import Data.Binary
-import Data.Typeable
-import Data.DeriveTH
-import GHC.Generics (Generic)
+import Hive.Types
 
-type QueenSearchReply = Maybe ProcessId
-
-type Queen     = ProcessId
-type Drone     = ProcessId
-type Client    = ProcessId
-type Scheduler = ProcessId
-type Logger    = ProcessId
-
-
-type Problem  = String
-type Solution = String
-
-data ProblemType   = TSP                                       deriving (Generic, Typeable, Show)
-data ClientRequest = ClientRequest Client ProblemType Problem  deriving (Generic, Typeable, Show)
+-- messages for debugging
+data IntMsg         = IntMsg { unIntMsg :: Int    }            deriving (Generic, Typeable, Show)
+data ChrMsg         = ChrMsg { unChrMsg :: Char   }            deriving (Generic, Typeable, Show)
+data StrMsg         = StrMsg { unStrMgs :: String }            deriving (Generic, Typeable, Show)
+data TxtMsg         = TxtMsg { unTxtMsg :: Text   }            deriving (Generic, Typeable, Show)
 
 -- messages from drones
 data DRegisterAtQ   = DRegisterAtQ Drone                       deriving (Generic, Typeable, Show)
@@ -43,8 +36,10 @@ data QWorkD         = QWorkD Problem                           deriving (Generic
 data QEnqueProblemS = QEnqueProblemS ClientRequest             deriving (Generic, Typeable, Show)
 
 
-$(derive makeBinary ''ProblemType)
-$(derive makeBinary ''ClientRequest)
+$(derive makeBinary ''IntMsg)
+$(derive makeBinary ''ChrMsg)
+$(derive makeBinary ''StrMsg)
+$(derive makeBinary ''TxtMsg)
 
 $(derive makeBinary ''DRegisterAtQ)
 $(derive makeBinary ''DWorkRequestS)

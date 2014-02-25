@@ -2,11 +2,13 @@
 
 module Hive.Queen
   ( startQueen
+  , searchQueen
   ) where
 
 import Control.Distributed.Process
 import Control.Distributed.Process.Backend.SimpleLocalnet
 
+import Data.Text (unpack)
 import Data.Set as Set
 
 import Hive.Data
@@ -31,7 +33,23 @@ startQueen _backend = do
     where
       serverLoop :: QueenState -> Process ()
       serverLoop state@(QueenState scheduler logger drones) =
-        receiveWait [ match $ \(DRegisterAtQ drone) -> do
+        receiveWait [ match $ \(IntMsg n) -> do
+                        say $ "Received IntMsg: " ++ show n
+                        serverLoop state
+
+                    , match $ \(ChrMsg c) -> do
+                        say $ "Received ChrMsg: " ++ [c]
+                        serverLoop state
+
+                    , match $ \(StrMsg s) -> do
+                        say $ "Received StrMsg: " ++ s
+                        serverLoop state
+
+                    , match $ \(TxtMsg t) -> do
+                        say $ "Received TxtMsg: " ++ unpack t
+                        serverLoop state
+
+                    , match $ \(DRegisterAtQ drone) -> do
                         say $ "Drone registered at " ++ show drone
                         send drone $ QRegisteredD scheduler logger
                         serverLoop $ QueenState scheduler logger (drone `insert` drones)
@@ -45,3 +63,16 @@ startQueen _backend = do
                         say "Unknown message received. Discarding..."
                         serverLoop state
                     ]
+
+searchQueen :: Backend -> Process QueenSearchReply
+searchQueen backend =
+  searchQueen' =<< liftIO (findPeers backend 1000000)
+    where
+      searchQueen' :: [NodeId] -> Process QueenSearchReply
+      searchQueen' (peer:ps) = do
+        whereisRemoteAsync peer "queen"
+        WhereIsReply _name remoteWhereIs <- expect
+        case remoteWhereIs of
+          Just queenPid -> return (Just queenPid)
+          Nothing       -> searchQueen' ps
+      searchQueen' [] = return Nothing
