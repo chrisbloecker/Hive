@@ -1,19 +1,28 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
-module Hive.Scheduler.Stretegy
+module Hive.Scheduler.Strategy
   where
 
-import Data.Sequence (Seq, (|>), index)
+import Control.Monad
+
+import Data.Sequence (Seq, (|>), (><), index, empty)
 
 -------------------------------------------------------------------------------
 
-class (Monad s) => Strategy s where
+class (Monad s, MonadPlus s) => Strategy s where
   enqueue :: a -> s a -> s a
   dequeue :: s a -> a
 
-newtype FIFO a = FIFO { unFIFO :: Seq a }
-  deriving (Eq, Show, Monad)
+-------------------------------------------------------------------------------
+-- FIFO Scheduler
+
+newtype FIFO a = FIFO (Seq a)
+  deriving (Monad)
+
+instance MonadPlus FIFO where
+  mzero = FIFO empty
+  (FIFO f1) `mplus` (FIFO f2)= FIFO $ f1 >< f2
 
 instance Strategy FIFO where
-  enqueue e fifo = FIFO $ unFIFO fifo |> e
-  dequeue        = flip index 1 . unFIFO
+  enqueue e (FIFO s)= FIFO $ s |> e
+  dequeue (FIFO s) = s `index` 1
