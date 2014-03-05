@@ -1,26 +1,33 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 module Hive.Drone
   ( startDrone
   ) where
 
 -------------------------------------------------------------------------------
 
+import Data.Text.Lazy (pack)
+
 import Control.Distributed.Process
 import Control.Distributed.Process.Backend.SimpleLocalnet
 
-import Hive.Types    ( Queen
-                     , Scheduler
-                     , Logger
-                     , Problem(Problem)
-                     , Solution(Solution)
-                     , Instance(unInstance)
-                     )
-import Hive.Messages ( QRegisteredD(QRegisteredD)
-                     , DRegisterAtQ(DRegisterAtQ)
-                     , SWorkReplyD(SWorkReplyD)
-                     , DWorkDoneS(DWorkDoneS)
-                     , DWorkRequestS(DWorkRequestS)
-                     )
-import Hive.Queen    (searchQueen)
+-------------------------------------------------------------------------------
+
+import Hive.Types                  ( Queen
+                                   , Scheduler
+                                   , Logger
+                                   , Problem(Problem)
+                                   , Solution(Solution)
+                                   , Instance(unInstance)
+                                   )
+import Hive.Messages               ( QRegisteredD(QRegisteredD)
+                                   , DRegisterAtQ(DRegisterAtQ)
+                                   , SWorkReplyD(SWorkReplyD)
+                                   , DWorkDoneS(DWorkDoneS)
+                                   , DWorkRequestS(DWorkRequestS)
+                                   )
+import Hive.Queen                  (searchQueen)
+import Hive.Problem.Data.External.Graph
 
 -------------------------------------------------------------------------------
 
@@ -55,5 +62,8 @@ startDrone backend = do
                       droneLoop state
                   ]
 
-    solve :: Problem -> Solution
-    solve (Problem _type inst) = Solution $ unInstance inst
+solve :: Problem -> Solution
+solve (Problem _type inst) =
+  case parse . unInstance $ inst of
+    Just graph -> Solution . pack . show $ graph
+    Nothing    -> Solution "Invalid input!"

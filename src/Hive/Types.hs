@@ -7,9 +7,9 @@ module Hive.Types
   , Scheduler
   , Logger
   , Problem(Problem)
-  , ProblemType(..)   -- reexporting
+  , ProblemType (..)  -- reexporting
   , Instance(Instance, unInstance)
-  , Solution(Solution)
+  , Solution(Solution, unSolution)
   , QueenSearchReply  -- ToDo: Why here?
   , ClientRequest(ClientRequest)
   ) where
@@ -20,17 +20,17 @@ module Hive.Types
 import Control.Distributed.Process (ProcessId)
 
 -- For the magic
-import Data.Binary        (Binary, put, get)
-import Data.Typeable      (Typeable)
-import Data.DeriveTH      (derive, makeBinary)
-import GHC.Generics       (Generic)
+import Data.Binary             (Binary, put, get)
+import Data.Typeable           (Typeable)
+import Data.DeriveTH           (derive, makeBinary)
+import GHC.Generics            (Generic)
 
 -- For problem instances
-import Data.Text          (Text)
-import Data.Text.Binary   ()
+import Data.Text.Lazy.Internal (Text)
+import Data.Text.Binary        ()
 
 -- For ProblemType
-import Hive.Problem.Types (ProblemType(..))
+import Hive.Problem.Types      (ProblemType (..))
 
 -------------------------------------------------------------------------------
 
@@ -45,7 +45,7 @@ type QueenSearchReply = Maybe Queen
 newtype Instance = Instance { unInstance :: Text } deriving (Generic, Typeable, Show)
 
 data Problem  = Problem ProblemType Instance       deriving (Generic, Typeable, Show)
-data Solution = Solution Text                      deriving (Generic, Typeable, Show)
+newtype Solution = Solution { unSolution :: Text } deriving (Generic, Typeable, Show)
 
 data ClientRequest = ClientRequest Client Problem  deriving (Generic, Typeable, Show)
 

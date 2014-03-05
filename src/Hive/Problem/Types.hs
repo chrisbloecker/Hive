@@ -1,7 +1,7 @@
 {-# LANGUAGE TemplateHaskell, DeriveGeneric, DeriveDataTypeable #-}
 
 module Hive.Problem.Types
-  (ProblemType(..)
+  ( ProblemType (..)
   ) where
 
 import Data.Binary

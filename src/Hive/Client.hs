@@ -1,3 +1,5 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 module Hive.Client
   ( solveRequest
   ) where
@@ -19,8 +21,6 @@ import Control.Concurrent.MVar ( MVar
                                , putMVar
                                , tryPutMVar
                                )
-
-import Data.Text     (pack)
 
 import Hive.Types    ( Problem
                      , Solution(Solution)
@@ -45,6 +45,6 @@ solveRequest backend problem mvar timeout = do
                           [ match $ \(SSolutionC solution) ->
                               liftIO . putMVar mvar $ solution
                           ]
-      _ <- liftIO . tryPutMVar mvar . Solution . pack $ "Sorry, timeout reached... Did't receive a solution in time..."
+      _ <- liftIO . tryPutMVar mvar . Solution $ "Sorry, timeout reached... Did't receive a solution in time..."
       return ()
     Nothing -> error "No Queen found... Terminating..."
