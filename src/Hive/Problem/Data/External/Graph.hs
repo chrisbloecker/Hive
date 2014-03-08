@@ -5,8 +5,8 @@ module Hive.Problem.Data.External.Graph
 
 import Data.Text.Lazy.Internal (Text)
 import Data.Text.Lazy.Encoding (encodeUtf8)
-import Data.Aeson
-import Data.Aeson.TH
+import Data.Aeson              (decode)
+import Data.Aeson.TH           (deriveJSON, defaultOptions)
 
 -------------------------------------------------------------------------------
 

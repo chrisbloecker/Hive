@@ -6,28 +6,22 @@ module Hive.Drone
 
 -------------------------------------------------------------------------------
 
-import Data.Text.Lazy (pack)
-
-import Control.Distributed.Process
-import Control.Distributed.Process.Backend.SimpleLocalnet
+import Control.Distributed.Process                        (Process, getSelfPid, link, send, expect,receiveWait, match, matchUnknown, unClosure, liftIO, say)
+import Control.Distributed.Process.Backend.SimpleLocalnet (Backend)
 
 -------------------------------------------------------------------------------
 
 import Hive.Types                  ( Queen
                                    , Scheduler
                                    , Logger
-                                   , Problem(Problem)
-                                   , Solution(Solution)
-                                   , Instance(unInstance)
+                                   , Task (..)
                                    )
 import Hive.Messages               ( QRegisteredD(QRegisteredD)
                                    , DRegisterAtQ(DRegisterAtQ)
                                    , SWorkReplyD(SWorkReplyD)
-                                   , DWorkDoneS(DWorkDoneS)
                                    , DWorkRequestS(DWorkRequestS)
                                    )
 import Hive.Queen                  (searchQueen)
-import Hive.Problem.Data.External.Graph
 
 -------------------------------------------------------------------------------
 
@@ -52,18 +46,12 @@ startDrone backend = do
     droneLoop state@(DroneState _queen scheduler _logger) = do
       dronePid <- getSelfPid
       send scheduler $ DWorkRequestS dronePid
-      receiveWait [ match $ \(SWorkReplyD (problem, client)) -> do
+      receiveWait [ match $ \(SWorkReplyD (Task closure)) -> do
                       say "Got work..."
-                      send scheduler $ DWorkDoneS (solve problem) client
+                      _ <- unClosure closure
                       droneLoop state
                   
                   , matchUnknown $ do
                       say "Unknown message received. Discarding..."
                       droneLoop state
                   ]
-
-solve :: Problem -> Solution
-solve (Problem _type inst) =
-  case parse . unInstance $ inst of
-    Just graph -> Solution . pack . show $ graph
-    Nothing    -> Solution "Invalid input!"

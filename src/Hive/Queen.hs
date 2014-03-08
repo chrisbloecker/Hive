@@ -25,7 +25,7 @@ startQueen :: Backend -> Process ()
 startQueen _backend = do
   queen     <- getSelfPid
   register "queen" queen
-  logger    <- spawnLocal $ startLogger queen
+  logger    <- spawnLocal $ startLogger    queen
   scheduler <- spawnLocal $ startScheduler queen logger
   say $ "Queen     is at " ++ show queen
   say $ "Logger    is at " ++ show logger

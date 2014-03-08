@@ -20,6 +20,9 @@ module Hive.Messages
   , SSolutionC(SSolutionC)
   , SWorkReplyD(SWorkReplyD)
 
+-- messages from warrior
+  , WTaskS(WTaskS)
+
 -- messages from queen
   , QRegisteredD(QRegisteredD)
   , QWorkD(QWorkD)
@@ -40,27 +43,30 @@ import Hive.Types
 -------------------------------------------------------------------------------
 
 -- debug messages
-data IntMsg         = IntMsg Int                               deriving (Generic, Typeable, Show)
-data ChrMsg         = ChrMsg Char                              deriving (Generic, Typeable, Show)
-data StrMsg         = StrMsg String                            deriving (Generic, Typeable, Show)
-data TxtMsg         = TxtMsg Text                              deriving (Generic, Typeable, Show)
+data IntMsg         = IntMsg Int                             deriving (Generic, Typeable, Show)
+data ChrMsg         = ChrMsg Char                            deriving (Generic, Typeable, Show)
+data StrMsg         = StrMsg String                          deriving (Generic, Typeable, Show)
+data TxtMsg         = TxtMsg Text                            deriving (Generic, Typeable, Show)
 
 -- messages from drones
-data DRegisterAtQ   = DRegisterAtQ Drone                       deriving (Generic, Typeable, Show)
-data DWorkRequestS  = DWorkRequestS Drone                      deriving (Generic, Typeable, Show)
-data DWorkDoneS     = DWorkDoneS Solution Client               deriving (Generic, Typeable, Show)
+data DRegisterAtQ   = DRegisterAtQ Drone                     deriving (Generic, Typeable, Show)
+data DWorkRequestS  = DWorkRequestS Drone                    deriving (Generic, Typeable, Show)
+data DWorkDoneS     = DWorkDoneS Solution Client             deriving (Generic, Typeable, Show)
 
 -- messages from clients
-data CSolveProblemQ = CSolveProblemQ ClientRequest             deriving (Generic, Typeable, Show)
+data CSolveProblemQ = CSolveProblemQ ClientRequest           deriving (Generic, Typeable, Show)
 
 -- messages from scheduler
-data SSolutionC     = SSolutionC Solution                      deriving (Generic, Typeable, Show)
-data SWorkReplyD    = SWorkReplyD (Problem, Client)            deriving (Generic, Typeable, Show)
+data SSolutionC     = SSolutionC Solution                    deriving (Generic, Typeable, Show)
+data SWorkReplyD    = SWorkReplyD Task                       deriving (Generic, Typeable, Show)
+
+-- messages from warrior
+data WTaskS         = WTaskS Warrior Task                    deriving (Generic, Typeable, Show)
 
 -- messages from queen
-data QRegisteredD   = QRegisteredD Scheduler Logger            deriving (Generic, Typeable, Show)
-data QWorkD         = QWorkD Problem                           deriving (Generic, Typeable, Show)
-data QEnqueProblemS = QEnqueProblemS ClientRequest             deriving (Generic, Typeable, Show)
+data QRegisteredD   = QRegisteredD Scheduler Logger          deriving (Generic, Typeable, Show)
+data QWorkD         = QWorkD Problem                         deriving (Generic, Typeable, Show)
+data QEnqueProblemS = QEnqueProblemS ClientRequest           deriving (Generic, Typeable, Show)
 
 -------------------------------------------------------------------------------
 
@@ -75,6 +81,7 @@ $(derive makeBinary ''DWorkDoneS)
 $(derive makeBinary ''CSolveProblemQ)
 $(derive makeBinary ''SSolutionC)
 $(derive makeBinary ''SWorkReplyD)
+$(derive makeBinary ''WTaskS)
 $(derive makeBinary ''QRegisteredD)
 $(derive makeBinary ''QWorkD)
 $(derive makeBinary ''QEnqueProblemS)

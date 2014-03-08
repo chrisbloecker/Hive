@@ -3,56 +3,50 @@
 module Hive.Types
   ( Queen
   , Drone
+  , Warrior
   , Client
   , Scheduler
   , Logger
+  , Task (..)
   , Problem(Problem)
   , ProblemType (..)  -- reexporting
-  , Instance(Instance, unInstance)
-  , Solution(Solution, unSolution)
+  , Instance (..)
+  , Solution (..)
   , QueenSearchReply  -- ToDo: Why here?
   , ClientRequest(ClientRequest)
   ) where
 
 -------------------------------------------------------------------------------
 
--- For ProcessId
-import Control.Distributed.Process (ProcessId)
+import Control.Distributed.Process (Process, ProcessId, Closure)
 
--- For the magic
 import Data.Binary             (Binary, put, get)
 import Data.Typeable           (Typeable)
 import Data.DeriveTH           (derive, makeBinary)
 import GHC.Generics            (Generic)
 
--- For problem instances
-import Data.Text.Lazy.Internal (Text)
-import Data.Text.Binary        ()
-
--- For ProblemType
-import Hive.Problem.Types      (ProblemType (..))
+import Hive.Problem.Types      ( ProblemType (..)
+                               , Problem (..)
+                               , Instance (..)
+                               , Solution (..)
+                               )
 
 -------------------------------------------------------------------------------
 
 type Queen     = ProcessId
 type Drone     = ProcessId
+type Warrior   = ProcessId
 type Client    = ProcessId
 type Scheduler = ProcessId
 type Logger    = ProcessId
 
 type QueenSearchReply = Maybe Queen
 
-newtype Instance = Instance { unInstance :: Text } deriving (Generic, Typeable, Show)
+data ClientRequest = ClientRequest Client Problem      deriving (Generic, Typeable, Show)
 
-data Problem  = Problem ProblemType Instance       deriving (Generic, Typeable, Show)
-newtype Solution = Solution { unSolution :: Text } deriving (Generic, Typeable, Show)
-
-data ClientRequest = ClientRequest Client Problem  deriving (Generic, Typeable, Show)
+data Task          = Task (Closure (Process ()))       deriving (Generic, Typeable, Show)
 
 -------------------------------------------------------------------------------
 
--- Let the magic begin...
-$(derive makeBinary ''Instance)
-$(derive makeBinary ''Problem)
-$(derive makeBinary ''Solution)
 $(derive makeBinary ''ClientRequest)
+$(derive makeBinary ''Task)
