@@ -8,25 +8,19 @@ module Hive.Scheduler
 
 import Control.Distributed.Process  (Process, link, receiveWait, match, matchIf, say, send, getSelfPid, spawnLocal)
 
-import Data.Sequence                (Seq, (|>))
-
 import Hive.Commander
 import Hive.Types                   (Queen, Logger, Task, ClientRequest (..))
 import Hive.Messages                ( QEnqueProblemS (..)
                                     , DWorkRequestS (..)
-                                    , DWorkDoneS (..)
-                                    , SSolutionC (..)
                                     , SWorkReplyD (..)
                                     , WTaskS (..)
                                     )
-
-import qualified Data.Sequence as S (empty, null, drop, index)
 
 -------------------------------------------------------------------------------
 
 data SchedulerState = SchedulerState { queen  :: Queen
                                      , logger :: Logger
-                                     , queue  :: Seq Task
+                                     , queue  :: [Task]
                                      }
   deriving (Show)
 
@@ -35,28 +29,23 @@ data SchedulerState = SchedulerState { queen  :: Queen
 startScheduler :: Queen -> Logger -> Process ()
 startScheduler queenPid loggerPid = do
   link queenPid
-  schedulerLoop $ SchedulerState queenPid loggerPid S.empty
+  schedulerLoop $ SchedulerState queenPid loggerPid []
     where
       schedulerLoop :: SchedulerState -> Process ()
-      schedulerLoop state@(SchedulerState{..}) =
+      schedulerLoop state@(SchedulerState{..}) = do
+        say $ "Currently there are " ++ (show . length $ queue) ++ " tasks in queue."
         receiveWait [ match $ \(QEnqueProblemS (ClientRequest client problem)) -> do
-                        say "New problem receives, starting commander..."
+                        say "New problem received, starting commander..."
                         self <- getSelfPid
-                        _ <- spawnLocal $ startCommander self client problem
+                        _ <- spawnLocal $ startCommander queen self client problem
                         schedulerLoop state
-                    
-                    -- ToDo: this will not happen, remove the handler
-                    , match $ \(DWorkDoneS solution client) -> do
-                        say "Solution found, sending to client..."
-                        send client $ SSolutionC solution
-                        schedulerLoop state
-                    
+
                     , match $ \(WTaskS _warrior task) -> do
                       say "Enqueueing a task"
-                      schedulerLoop $ SchedulerState queen logger (queue |> task)
-                    
-                    , matchIf (\_ -> not . S.null $ queue) $ \(DWorkRequestS drone) -> do
+                      schedulerLoop $ SchedulerState queen logger (queue ++ [task])
+
+                    , matchIf (\_ -> not . null $ queue) $ \(DWorkRequestS drone) -> do
                         say $ "Work request from " ++ show drone
-                        send drone $ SWorkReplyD (queue `S.index` 0)
-                        schedulerLoop $ SchedulerState queen logger (S.drop 1 queue)
+                        send drone $ SWorkReplyD (head queue)
+                        schedulerLoop $ SchedulerState queen logger (tail queue)
                     ]

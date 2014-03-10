@@ -16,10 +16,11 @@ import Hive.Types                  ( Queen
                                    , Logger
                                    , Task (..)
                                    )
-import Hive.Messages               ( QRegisteredD(QRegisteredD)
-                                   , DRegisterAtQ(DRegisterAtQ)
-                                   , SWorkReplyD(SWorkReplyD)
-                                   , DWorkRequestS(DWorkRequestS)
+import Hive.Messages               ( QRegisteredD (..)
+                                   , DRegisterAtQ (..)
+                                   , SWorkReplyD (..)
+                                   , DWorkRequestS (..)
+                                   , StrMsg (..)
                                    )
 import Hive.Queen                  (searchQueen)
 
@@ -39,16 +40,21 @@ startDrone backend = do
       send queen $ DRegisterAtQ dronePid
       QRegisteredD scheduler logger <- expect
       link queen
+      say "This drone is running..."
       droneLoop $ DroneState queen scheduler logger
     Nothing -> liftIO . putStrLn $ "No Queen found... Terminating..."
   where
     droneLoop :: DroneState -> Process ()
-    droneLoop state@(DroneState _queen scheduler _logger) = do
+    droneLoop state@(DroneState queen scheduler _logger) = do
+      send queen $ StrMsg "Entering drone loop..."
       dronePid <- getSelfPid
       send scheduler $ DWorkRequestS dronePid
       receiveWait [ match $ \(SWorkReplyD (Task closure)) -> do
-                      say "Got work..."
-                      _ <- unClosure closure
+                      send queen $ StrMsg "A drone got work..."
+                      proc <- unClosure closure
+                      send queen $ StrMsg "Closure unpacked..."
+                      proc
+                      send queen $ StrMsg "Closure executed..."
                       droneLoop state
                   
                   , matchUnknown $ do

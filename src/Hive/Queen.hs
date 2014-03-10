@@ -22,7 +22,7 @@ data QueenState = QueenState Scheduler Logger (Set Drone)
 
 
 startQueen :: Backend -> Process ()
-startQueen _backend = do
+startQueen backend = do
   queen     <- getSelfPid
   register "queen" queen
   logger    <- spawnLocal $ startLogger    queen

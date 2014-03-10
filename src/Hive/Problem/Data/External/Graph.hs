@@ -13,10 +13,13 @@ import Data.Aeson.TH           (deriveJSON, defaultOptions)
 type Node     = Integer
 type Distance = Integer
 type Edge     = (Node, Node, Distance)
+type Position = (Integer, Integer)
 
 data Graph = Graph { nodes :: [Node]
                    , edges :: [Edge]
                    }
+           | PosList { positions :: [(Node, Position)]
+                     }
   deriving (Show, Eq)
 
 -------------------------------------------------------------------------------

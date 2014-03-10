@@ -23,6 +23,8 @@ library
                        containers,
                        aeson,
                        bytestring,
+                       random,
+                       array,
                        distributed-process >= 0.4 && < 0.5,
                        distributed-process-simplelocalnet >= 0.2 && < 0.3,
                        binary >= 0.5 && < 0.6,
@@ -30,12 +32,13 @@ library
   -- Compatibility with previous GHC versions.
   if impl(ghc < 7.6)
     build-depends: ghc-prim
-  exposed-modules:     Hive.Client
-                       Hive.Types
-                       Hive.Problem.Types
-  other-modules:       Hive.Queen
-                       Hive.Scheduler
+  exposed-modules:     Hive.Queen
                        Hive.Drone
+                       Hive.Client
+                       Hive.Types
+                       Hive.RemoteTable
+                       Hive.Problem.Types
+  other-modules:       Hive.Scheduler
                        Hive.Commander
                        Hive.Logger
                        Hive.Messages
