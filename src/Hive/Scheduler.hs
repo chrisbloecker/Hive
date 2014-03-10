@@ -10,11 +10,7 @@ import Control.Distributed.Process  (Process, link, receiveWait, match, matchIf,
 
 import Hive.Commander
 import Hive.Types                   (Queen, Logger, Task, ClientRequest (..))
-import Hive.Messages                ( QEnqueProblemS (..)
-                                    , DWorkRequestS (..)
-                                    , SWorkReplyD (..)
-                                    , WTaskS (..)
-                                    )
+import Hive.Messages                (QEnqueProblemS (..), DWorkRequestS (..), SWorkReplyD (..), WTaskS (..), SSendSolutionW (..))
 
 -------------------------------------------------------------------------------
 
@@ -37,7 +33,8 @@ startScheduler queenPid loggerPid = do
         receiveWait [ match $ \(QEnqueProblemS (ClientRequest client problem)) -> do
                         say "New problem received, starting commander..."
                         self <- getSelfPid
-                        _ <- spawnLocal $ startCommander queen self client problem
+                        commanderPid <- spawnLocal $ startCommander queen self client problem
+                        send commanderPid SSendSolutionW
                         schedulerLoop state
 
                     , match $ \(WTaskS _warrior task) -> do

@@ -28,5 +28,9 @@ $(deriveJSON defaultOptions ''Graph)
 
 -------------------------------------------------------------------------------
 
+size :: Graph -> Integer
+size (Graph   ns _) = fromIntegral . length $ ns
+size (PosList ps  ) = fromIntegral . length $ ps
+
 parse :: Text -> Maybe Graph
 parse = decode . encodeUtf8

@@ -19,6 +19,7 @@ module Hive.Messages
 -- messages from scheduler
   , SSolutionC(SSolutionC)
   , SWorkReplyD(SWorkReplyD)
+  , SSendSolutionW(SSendSolutionW)
 
 -- messages from warrior
   , WTaskS(WTaskS)
@@ -59,6 +60,7 @@ data CSolveProblemQ = CSolveProblemQ ClientRequest           deriving (Generic, 
 -- messages from scheduler
 data SSolutionC     = SSolutionC Solution                    deriving (Generic, Typeable, Show)
 data SWorkReplyD    = SWorkReplyD Task                       deriving (Generic, Typeable, Show)
+data SSendSolutionW = SSendSolutionW                         deriving (Generic, Typeable, Show)
 
 -- messages from warrior
 data WTaskS         = WTaskS Warrior Task                    deriving (Generic, Typeable, Show)
@@ -81,6 +83,7 @@ $(derive makeBinary ''DWorkDoneS)
 $(derive makeBinary ''CSolveProblemQ)
 $(derive makeBinary ''SSolutionC)
 $(derive makeBinary ''SWorkReplyD)
+$(derive makeBinary ''SSendSolutionW)
 $(derive makeBinary ''WTaskS)
 $(derive makeBinary ''QRegisteredD)
 $(derive makeBinary ''QWorkD)

@@ -5,24 +5,22 @@ module Hive.Problem.TSP.Warrior
   , __remoteTable
   ) where
 
-import Control.Distributed.Process (Process, ProcessId, send, getSelfPid, receiveWait, match, liftIO)
+import Control.Distributed.Process (Process, ProcessId, send, getSelfPid, receiveWait, match, matchIf, liftIO)
 import Control.Distributed.Process.Closure (remotable, mkClosure)
 
-import Data.Binary   (Binary, put, get)
-import Data.Typeable (Typeable)
-import Data.DeriveTH (derive, makeBinary)
-import GHC.Generics  (Generic)
+import Control.Monad     (forM_)
+import Data.Text.Lazy    (pack)
+import Data.Binary       (Binary, put, get)
+import Data.Typeable     (Typeable)
+import Data.DeriveTH     (derive, makeBinary)
+import GHC.Generics      (Generic)
 
--- for shuffle
-import Control.Monad     (forM, forM_)
-import System.Random     (randomRIO)
-import Data.Array.IO     (IOArray)
-import Data.Array.MArray (readArray, writeArray, newListArray)
-
-import Hive.Types    (Queen, Warrior, Scheduler, Client, Task (..))
-import Hive.Messages (WTaskS (..), StrMsg (..))
+import Hive.Types            (Queen, Warrior, Scheduler, Client, Task (..))
+import Hive.Problem.Types    (Solution (..))
+import Hive.Messages         (WTaskS (..), StrMsg (..), SSolutionC (..), SSendSolutionW (..))
+import Hive.Problem.TSP.Permutation (shuffle)
 import qualified Hive.Problem.Data.External.Graph as External (Graph)
-import qualified Hive.Problem.Data.Internal.Graph as Internal (Graph, Path, size, mkDirectedGraphFromExternalGraph, pathLength, shorterPath)
+import qualified Hive.Problem.Data.Internal.Graph as Internal (Graph, Path, size, mkGraphFromExternalGraph, pathLength, shorterPath)
 
 -------------------------------------------------------------------------------
 
@@ -30,15 +28,16 @@ type Worker    = ProcessId
 data Register  = Register Worker                   deriving (Generic, Typeable, Show)
 data SetGraph  = SetGraph Internal.Graph           deriving (Generic, Typeable, Show)
 data Run       = Run                               deriving (Generic, Typeable, Show)
-data Solution  = Solution Integer Internal.Path    deriving (Generic, Typeable, Show)
+data Candidate = Candidate Integer Internal.Path   deriving (Generic, Typeable, Show)
 data Terminate = Terminate                         deriving (Generic, Typeable, Show)
 
 data WorkerS   = WorkerS { warrior :: Warrior
                          , graph   :: Internal.Graph
                          } deriving (Eq, Show)
 
-data WarriorS  = WarriorS { workers   :: [Worker]
-                          , solutions :: [(Integer, Internal.Path)]
+data WarriorS  = WarriorS { workers    :: [Worker]
+                          , taskCount  :: Integer
+                          , solutions  :: [(Integer, Internal.Path)]
                           } deriving (Eq, Show)
 
 -------------------------------------------------------------------------------
@@ -46,7 +45,7 @@ data WarriorS  = WarriorS { workers   :: [Worker]
 $(derive makeBinary ''Register)
 $(derive makeBinary ''SetGraph)
 $(derive makeBinary ''Run)
-$(derive makeBinary ''Solution)
+$(derive makeBinary ''Candidate)
 $(derive makeBinary ''Terminate)
 
 -------------------------------------------------------------------------------
@@ -58,7 +57,8 @@ worker (warriorPid, graphIn) = do
   workerLoop $ WorkerS warriorPid graphIn
     where
       workerLoop :: WorkerS -> Process ()
-      workerLoop state@(WorkerS {..}) =
+      workerLoop state@(WorkerS {..}) = do
+        send warrior $ StrMsg "Entering worker loop..."
         receiveWait [ match $ \(SetGraph g) ->
                         workerLoop $ state { graph = g }
 
@@ -67,27 +67,13 @@ worker (warriorPid, graphIn) = do
                         solutions <- mapM (const solve) ([1..100] :: [Integer])
                         let solution = foldr (Internal.shorterPath graph) (head solutions) (tail solutions)
                         case Internal.pathLength graph solution of
-                          Just distance -> send warrior $ Solution distance solution
-                          Nothing       -> return ()
+                          Just distance -> send warrior $ Candidate distance solution
+                          Nothing       -> send warrior $ Candidate 0 []
                         workerLoop state
 
                     , match $ \Terminate ->
                         return ()
                     ]
-
-shuffle :: [a] -> IO [a]
-shuffle xs = do
-  ar <- newArray n xs
-  forM [1..n] $ \i -> do
-    j  <- randomRIO (i,n)
-    vi <- readArray ar i
-    vj <- readArray ar j
-    writeArray ar j vi
-    return vj
-  where
-    n = length xs
-    newArray :: Int -> [a] -> IO (IOArray Int a)
-    newArray n' = newListArray (1,n')
 
 remotable ['worker]
 
@@ -96,19 +82,31 @@ remotable ['worker]
 run :: Queen -> Scheduler -> Client -> External.Graph -> Process ()
 run queen scheduler client graph = do
   send queen $ StrMsg "New Warrior up!"
-  let graph' = Internal.mkDirectedGraphFromExternalGraph graph
+  let graph' = Internal.mkGraphFromExternalGraph graph
   self <- getSelfPid
-  let task = Task ($(mkClosure 'worker) (self :: Warrior))
-  forM_ [1..(Internal.size graph' `div` 25 + 1)] $ \_ ->
-    send scheduler $ WTaskS self task
-  loop $ WarriorS [] []
+  let task = Task ($(mkClosure 'worker) (self :: Warrior, graph'))
+  let taskCount = Internal.size graph' `div` 25 + 1
+  forM_ [1..taskCount] $ \_ -> send scheduler $ WTaskS self task
+  loop $ WarriorS [] taskCount []
     where
       loop :: WarriorS -> Process ()
       loop state@(WarriorS {..}) =
-        receiveWait [ match $ \(Register pid) -> do
-                        send queen $ StrMsg $ "A worker registered: " ++ show pid
-                        loop $ state { workers = pid : workers }
+        receiveWait [ match $ \(Register workerPid) -> do
+                        send queen $ StrMsg $ "A worker registered: " ++ show workerPid
+                        send workerPid Run
+                        loop $ state { workers = workerPid : workers }
 
-                    , match $ \(Solution int path) ->
+                    , match $ \(Candidate int path) -> do
+                        send queen $ StrMsg "Got a solution from a worker..."
                         loop $ state { solutions = (int, path) : solutions }
+
+                    , match $ \s@(StrMsg _) -> do
+                        send queen s
+                        loop state
+
+                    , matchIf (\_ -> (fromIntegral . length $ solutions) == taskCount) $ \SSendSolutionW -> do
+                        forM_ workers $ \w -> send w Terminate
+                        let solution = minimum solutions
+                        send client $ SSolutionC $ Solution (pack . show $ solution)
+                        return ()
                     ]
