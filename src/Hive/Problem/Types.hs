@@ -23,11 +23,20 @@ data ProblemType  = TSP  -- Traveling Salesman Problem
   deriving (Eq, Show, Enum, Bounded, Generic, Typeable)
 
 newtype Instance = Instance { unInstance :: Text }           deriving (Generic, Typeable, Show)
-newtype Solution = Solution { unSolution :: Text }           deriving (Generic, Typeable, Show)
+--newtype Solution = Solution { unSolution :: Text }           deriving (Generic, Typeable, Show)
 
-data Problem     = Problem  { problemType :: ProblemType
-                            , inst        :: Instance
-                            }
+data Solution = Solution { unSolution :: Text
+                         , unValue    :: Integer
+                         }
+              | NoSolution
+              | InvalidInput
+              | TimeoutReached
+              | NotImplemented
+  deriving (Generic, Typeable, Show)
+
+data Problem = Problem  { problemType :: ProblemType
+                        , inst        :: Instance
+                        }
   deriving (Generic, Typeable, Show)
 
 -------------------------------------------------------------------------------

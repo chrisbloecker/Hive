@@ -16,13 +16,15 @@ import Hive.Messages
 import Hive.Logger
 import Hive.Scheduler
 
+-------------------------------------------------------------------------------
 
 data QueenState = QueenState Scheduler Logger (Set Drone)
   deriving (Show)
 
+-------------------------------------------------------------------------------
 
 startQueen :: Backend -> Process ()
-startQueen backend = do
+startQueen _backend = do
   queen     <- getSelfPid
   register "queen" queen
   logger    <- spawnLocal $ startLogger    queen
@@ -67,7 +69,7 @@ startQueen backend = do
 
 searchQueen :: Backend -> Process QueenSearchReply
 searchQueen backend =
-  searchQueen' =<< liftIO (findPeers backend 1000000)
+  searchQueen' =<< liftIO (findPeers backend 250000)
     where
       searchQueen' :: [NodeId] -> Process QueenSearchReply
       searchQueen' (peer:ps) = do

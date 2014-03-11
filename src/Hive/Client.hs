@@ -6,29 +6,13 @@ module Hive.Client
 
 -------------------------------------------------------------------------------
 
--- For CloudHaskell
 import Control.Distributed.Process.Backend.SimpleLocalnet (Backend)
-import Control.Distributed.Process                        ( Process
-                                                          , getSelfPid
-                                                          , liftIO
-                                                          , send
-                                                          , receiveTimeout
-                                                          , match
-                                                          )
+import Control.Distributed.Process                        (Process, getSelfPid, liftIO, send, receiveTimeout, match)
 
--- "Synchronisation" with calling process
-import Control.Concurrent.MVar ( MVar
-                               , putMVar
-                               , tryPutMVar
-                               )
+import Control.Concurrent.MVar (MVar, putMVar, tryPutMVar)
 
-import Hive.Types    ( Problem
-                     , Solution(Solution)
-                     , ClientRequest(ClientRequest)
-                     )
-import Hive.Messages ( CSolveProblemQ(CSolveProblemQ)
-                     , SSolutionC(SSolutionC)
-                     )
+import Hive.Types    (Problem, Solution (TimeoutReached), ClientRequest (ClientRequest))
+import Hive.Messages (CSolveProblemQ(CSolveProblemQ), SSolutionC(SSolutionC))
 import Hive.Queen    (searchQueen)
 
 -------------------------------------------------------------------------------
@@ -45,6 +29,6 @@ solveRequest backend problem mvar timeout = do
                           [ match $ \(SSolutionC solution) ->
                               liftIO . putMVar mvar $ solution
                           ]
-      _ <- liftIO . tryPutMVar mvar . Solution $ "Sorry, timeout reached... Did't receive a solution in time..."
+      _ <- liftIO . tryPutMVar mvar $ TimeoutReached
       return ()
     Nothing -> error "No Queen found... Terminating..."

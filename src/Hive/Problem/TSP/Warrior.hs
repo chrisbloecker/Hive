@@ -106,7 +106,7 @@ run queen scheduler client graph = do
 
                     , matchIf (\_ -> (fromIntegral . length $ solutions) == taskCount) $ \SSendSolutionW -> do
                         forM_ workers $ \w -> send w Terminate
-                        let solution = minimum solutions
-                        send client $ SSolutionC $ Solution (pack . show $ solution)
+                        let (value, solution) = minimum solutions
+                        send client $ SSolutionC $ Solution (pack . show $ solution) value
                         return ()
                     ]
