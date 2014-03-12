@@ -12,7 +12,6 @@ module Hive.Problem.Data.Internal.Graph
   , distance
   , addEdge
   , updateEdge
-  , removeEdge
   , neighbours
   , pathLength
   , shorterPath
@@ -23,8 +22,8 @@ import Data.DeriveTH       (derive, makeBinary)
 import Data.Typeable       (Typeable)
 import GHC.Generics        (Generic)
 
-import Data.List           ((\\), nub)
-import Data.Map            (Map, empty, insert, delete, filterWithKey, keys)
+import Data.List           ((\\))
+import Data.IntMap.Strict  (IntMap, empty, keys)
 import Data.Vector         (Vector)
 import Data.Vector.Binary  ()
 import Control.Applicative (Applicative, (<$>), (<*>))
@@ -32,17 +31,17 @@ import Control.Applicative (Applicative, (<$>), (<*>))
 -------------------------------------------------------------------------------
 
 import qualified Data.Vector                      as Vector   ((!), length, toList, fromList)
-import qualified Data.Map                         as Map
+import qualified Data.IntMap.Strict               as Map
 import qualified Hive.Problem.Data.External.Graph as External (Graph (..), size)
 
 -------------------------------------------------------------------------------
 
-type Size     = Integer
-type Node     = Integer
+type Size     = Int
+type Node     = Int
 type Distance = Integer
 type Path     = [Node]
-type Position = (Integer, Integer)
-type Matrix   = Map (Node, Node) Distance
+type Position = (Int, Int)
+type Matrix   = IntMap (IntMap Distance)
 
 data Graph = DirectedGraph Size Matrix
            | PositionList  (Vector Position)
@@ -66,36 +65,38 @@ mkGraphFromExternalGraph graph@(External.Graph _ e) =
   in  foldr (\(from,to,val) g' -> addEdge g' from to val) g e
 mkGraphFromExternalGraph (External.PosList ps) =
   PositionList . Vector.fromList . map snd $ ps
+mkGraphFromExternalGraph graph@(External.DistanceList dl) =
+  let g = mkDirectedGraph (External.size graph)
+  in  foldr (\(from,toList) g' -> foldr (\(to,d) g'' -> addEdge g'' from to d) g' toList) g dl
 
 size :: Graph -> Size
 size (DirectedGraph s _) = s
 size (PositionList  ps ) = fromIntegral . Vector.length $ ps
 
 nodes :: Graph -> [Node]
-nodes (DirectedGraph  _ m) = nub . concatMap (\(f,s) -> [f,s]) . keys $ m
+nodes (DirectedGraph  s _) = [1..s]
 nodes (PositionList  ps  ) = map fst . Vector.toList $ ps
 
 distance :: Graph -> Node -> Node -> Maybe Distance
-distance (DirectedGraph  _ m) from to = (from, to) `Map.lookup` m
+distance (DirectedGraph  _ m) from to = from `Map.lookup` m >>= \m' -> to `Map.lookup` m'
 distance (PositionList  ps  ) from to =
   let (x1, y1) = ps Vector.! fromIntegral from
       (x2, y2) = ps Vector.! fromIntegral to
   in  Just . round . sqrt . fromIntegral $ ((x1-x2)^2 + (y1-y2)^2)
 
 addEdge :: Graph -> Node -> Node -> Distance -> Graph
-addEdge (DirectedGraph s m) from to d = DirectedGraph s (insert (from, to) d m)
+addEdge (DirectedGraph s m) from to d = DirectedGraph s (Map.insertWith Map.union from (Map.singleton to d) m) -- ToDo: something more intelligent than union
 addEdge (PositionList  _  ) _    _  _ = error "This graph is complete, you cannot add an edge."
 
 updateEdge :: Graph -> Node -> Node -> Distance -> Graph
 updateEdge g@(DirectedGraph _ _) = addEdge g
 updateEdge g@(PositionList  _  ) = addEdge g
 
-removeEdge :: Graph -> Node -> Node -> Graph
-removeEdge (DirectedGraph s m) from to = DirectedGraph s ((from, to) `delete` m)
-removeEdge (PositionList  _  )    _  _ = error "This graph is complete, you cannot remove an edge."
-
 neighbours :: Graph -> Node -> [Node]
-neighbours   (DirectedGraph _ m) from = map snd . Map.keys $ filterWithKey (\k _ -> fst k == from) m
+neighbours   (DirectedGraph _ m) from =
+  case from `Map.lookup` m of
+    Just m' -> keys m'
+    Nothing -> []
 neighbours g@(PositionList  _  ) from = nodes g \\ [from]
 
 pathLength :: Graph -> Path -> Maybe Distance

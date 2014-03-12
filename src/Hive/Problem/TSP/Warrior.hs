@@ -25,18 +25,17 @@ import qualified Hive.Problem.Data.Internal.Graph as Internal (Graph, Path, size
 -------------------------------------------------------------------------------
 
 type Worker    = ProcessId
-data Register  = Register Worker                   deriving (Generic, Typeable, Show)
-data SetGraph  = SetGraph Internal.Graph           deriving (Generic, Typeable, Show)
-data Run       = Run                               deriving (Generic, Typeable, Show)
-data Candidate = Candidate Integer Internal.Path   deriving (Generic, Typeable, Show)
-data Terminate = Terminate                         deriving (Generic, Typeable, Show)
+data Register  = Register Worker                          deriving (Generic, Typeable, Show)
+data SetGraph  = SetGraph Internal.Graph                  deriving (Generic, Typeable, Show)
+data Run       = Run                                      deriving (Generic, Typeable, Show)
+data Candidate = Candidate Worker Integer Internal.Path   deriving (Generic, Typeable, Show)
+data Terminate = Terminate                                deriving (Generic, Typeable, Show)
 
 data WorkerS   = WorkerS { warrior :: Warrior
                          , graph   :: Internal.Graph
                          } deriving (Eq, Show)
 
-data WarriorS  = WarriorS { workers    :: [Worker]
-                          , taskCount  :: Integer
+data WarriorS  = WarriorS { taskCount  :: Int
                           , solutions  :: [(Integer, Internal.Path)]
                           } deriving (Eq, Show)
 
@@ -64,11 +63,12 @@ worker (warriorPid, graphIn) = do
 
                     , match $ \Run -> do
                         let solve = (liftIO . shuffle) [0 .. (Internal.size graph - 1)]
-                        solutions <- mapM (const solve) ([1..100] :: [Integer])
+                        solutions <- mapM (const solve) ([1..10000] :: [Integer])
                         let solution = foldr (Internal.shorterPath graph) (head solutions) (tail solutions)
+                        self <- getSelfPid
                         case Internal.pathLength graph solution of
-                          Just distance -> send warrior $ Candidate distance solution
-                          Nothing       -> send warrior $ Candidate 0 []
+                          Just distance -> send warrior $ Candidate self distance solution
+                          Nothing       -> send warrior $ Candidate self 0 []
                         workerLoop state
 
                     , match $ \Terminate ->
@@ -87,16 +87,17 @@ run queen scheduler client graph = do
   let task = Task ($(mkClosure 'worker) (self :: Warrior, graph'))
   let taskCount = Internal.size graph' `div` 25 + 1
   forM_ [1..taskCount] $ \_ -> send scheduler $ WTaskS self task
-  loop $ WarriorS [] taskCount []
+  loop $ WarriorS taskCount []
     where
       loop :: WarriorS -> Process ()
       loop state@(WarriorS {..}) =
         receiveWait [ match $ \(Register workerPid) -> do
                         send queen $ StrMsg $ "A worker registered: " ++ show workerPid
                         send workerPid Run
-                        loop $ state { workers = workerPid : workers }
+                        loop state
 
-                    , match $ \(Candidate int path) -> do
+                    , match $ \(Candidate workerPid int path) -> do
+                        send workerPid Terminate
                         send queen $ StrMsg "Got a solution from a worker..."
                         loop $ state { solutions = (int, path) : solutions }
 
@@ -105,7 +106,6 @@ run queen scheduler client graph = do
                         loop state
 
                     , matchIf (\_ -> (fromIntegral . length $ solutions) == taskCount) $ \SSendSolutionW -> do
-                        forM_ workers $ \w -> send w Terminate
                         let (value, solution) = minimum solutions
                         send client $ SSolutionC $ Solution (pack . show $ solution) value
                         return ()

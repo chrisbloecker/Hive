@@ -10,16 +10,19 @@ import Data.Aeson.TH           (deriveJSON, defaultOptions)
 
 -------------------------------------------------------------------------------
 
-type Node     = Integer
+type Node     = Int
 type Distance = Integer
 type Edge     = (Node, Node, Distance)
-type Position = (Integer, Integer)
+type Position = (Int, Int)
+type DistanceEntry = (Node, [(Node,Distance)])
 
 data Graph = Graph { nodes :: [Node]
                    , edges :: [Edge]
                    }
            | PosList { positions :: [(Node, Position)]
                      }
+           | DistanceList { distances :: [DistanceEntry]
+                          }
   deriving (Show, Eq)
 
 -------------------------------------------------------------------------------
@@ -28,9 +31,10 @@ $(deriveJSON defaultOptions ''Graph)
 
 -------------------------------------------------------------------------------
 
-size :: Graph -> Integer
-size (Graph   ns _) = fromIntegral . length $ ns
-size (PosList ps  ) = fromIntegral . length $ ps
+size :: Graph -> Int
+size (Graph        ns _) = length ns
+size (PosList      ps  ) = length ps
+size (DistanceList dl  ) = length dl
 
 parse :: Text -> Maybe Graph
 parse = decode . encodeUtf8

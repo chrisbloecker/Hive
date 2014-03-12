@@ -27,6 +27,7 @@ library
                        array,
                        vector,
                        vector-binary-instances,
+                       hashmap,
                        distributed-process >= 0.4 && < 0.5,
                        distributed-process-simplelocalnet >= 0.2 && < 0.3,
                        binary >= 0.5 && < 0.6,
@@ -46,6 +47,7 @@ library
                        Hive.Messages
                        Hive.Problem.TSP.Permutation
                        Hive.Problem.TSP.Warrior
+                       Hive.Problem.SSSP.Warrior
                        Hive.Problem.Data.Internal.Graph
                        Hive.Problem.Data.External.Graph
   hs-source-dirs:      src

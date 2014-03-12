@@ -58,7 +58,7 @@ startQueen _backend = do
                         serverLoop $ QueenState scheduler logger (drone `insert` drones)
 
                     , match $ \(CSolveProblemQ problem) -> do
-                        say $ "Solve request: " ++ show problem
+                        say "Solve request received..."
                         send scheduler $ QEnqueProblemS problem
                         serverLoop state
 
