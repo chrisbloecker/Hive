@@ -5,22 +5,19 @@ module Hive.Problem.SSSP.Warrior
   , __remoteTable
   ) where
 
-import Control.Distributed.Process (Process, ProcessId, send, getSelfPid, receiveWait, match, matchIf, liftIO)
+import Control.Distributed.Process (Process, ProcessId, send, expect, getSelfPid)
 import Control.Distributed.Process.Closure (remotable, mkClosure)
 
 import Control.Monad     (forM_)
-import Data.Text.Lazy    (pack)
 import Data.Binary       (Binary, put, get)
 import Data.Typeable     (Typeable)
 import Data.DeriveTH     (derive, makeBinary)
 import GHC.Generics      (Generic)
 
 import Hive.Types            (Queen, Warrior, Scheduler, Client, Task (..))
-import Hive.Problem.Types    (Solution (..))
-import Hive.Messages         (WTaskS (..), StrMsg (..), SSolutionC (..), SSendSolutionW (..))
-import Hive.Problem.TSP.Permutation (shuffle)
+import Hive.Messages         (StrMsg (..), WGiveMeDronesS (..), SYourDronesW (..), SWorkReplyD (..))
 import qualified Hive.Problem.Data.External.Graph as External (Graph)
-import qualified Hive.Problem.Data.Internal.Graph as Internal (Graph, Path, size, mkGraphFromExternalGraph, pathLength, shorterPath, distance)
+import qualified Hive.Problem.Data.Internal.Graph as Internal (Graph, Path, size, mkGraphFromExternalGraph)
 
 -------------------------------------------------------------------------------
 
@@ -30,13 +27,13 @@ data SetGraph  = SetGraph Internal.Graph                  deriving (Generic, Typ
 data Run       = Run                                      deriving (Generic, Typeable, Show)
 data Candidate = Candidate Worker Integer Internal.Path   deriving (Generic, Typeable, Show)
 data Terminate = Terminate                                deriving (Generic, Typeable, Show)
+data Tick      = Tick                                     deriving (Generic, Typeable, Show)
 
-data WorkerS   = WorkerS { warrior :: Warrior
-                         , graph   :: Internal.Graph
+data WorkerS   = WorkerS { warrior  :: Warrior
+                         , vertices :: Internal.Graph
                          } deriving (Eq, Show)
 
-data WarriorS  = WarriorS { taskCount  :: Integer
-                          , solutions  :: [(Integer, Internal.Path)]
+data WarriorS  = WarriorS { workers :: [Worker]
                           } deriving (Eq, Show)
 
 -------------------------------------------------------------------------------
@@ -46,11 +43,14 @@ $(derive makeBinary ''SetGraph)
 $(derive makeBinary ''Run)
 $(derive makeBinary ''Candidate)
 $(derive makeBinary ''Terminate)
+$(derive makeBinary ''Tick)
 
 -------------------------------------------------------------------------------
 
-worker :: (Warrior, Internal.Graph) -> Process ()
-worker (warriorPid, graphIn) = undefined
+worker :: Warrior -> Process ()
+worker warriorPid = do
+  self <- getSelfPid
+  send warriorPid $ Register self
 
 remotable ['worker]
 
@@ -60,4 +60,23 @@ run :: Queen -> Scheduler -> Client -> External.Graph -> Process ()
 run queen scheduler client graph = do
   send queen $ StrMsg "New Warrior up!"
   let graph' = Internal.mkGraphFromExternalGraph graph
-  send client $ SSolutionC $ Solution (pack . show $ graph') 0
+  send scheduler $ WGiveMeDronesS (round . (log :: Double -> Double) . fromIntegral $ Internal.size graph')
+  (SYourDronesW drones) <- expect
+  self <- getSelfPid
+  sendAll drones $ SWorkReplyD . Task $ $(mkClosure 'worker) (self :: Warrior) -- ToDo: this message should not be generated here
+  ws <- collectWorker (length drones) []
+  loop $ WarriorS ws
+    where
+      loop :: WarriorS -> Process ()
+      loop _state@(WarriorS {..}) = do
+        sendAll workers Tick
+        return ()
+
+      collectWorker :: Int -> [Worker] -> Process [Worker]
+      collectWorker n ws | length ws == n  = return ws
+                         | otherwise       = do
+                            (Register w) <- expect -- ToDo: timeout?
+                            collectWorker n (w:ws)
+
+      sendAll :: (Binary a, Typeable a, Generic a) => [Worker] -> a -> Process ()
+      sendAll ws msg = forM_ ws $ \w -> send w msg

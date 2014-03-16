@@ -1,10 +1,12 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 module Hive.Drone
-  ( startDrone
+  ( runDrone
   ) where
 
 -------------------------------------------------------------------------------
+
+import System.Process  (readProcess)
 
 import Control.Distributed.Process                        (Process, getSelfPid, link, send, expect,receiveWait, match, matchUnknown, unClosure, liftIO, say)
 import Control.Distributed.Process.Backend.SimpleLocalnet (Backend)
@@ -31,21 +33,21 @@ data DroneState = DroneState Queen Scheduler Logger
 
 -------------------------------------------------------------------------------
 
-startDrone :: Backend -> Process ()
-startDrone backend = do
+runDrone :: Backend -> Process ()
+runDrone backend = do
   dronePid <- getSelfPid
   queenPid <- searchQueen backend
   case queenPid of
     Just queen -> do
-      send queen $ DRegisterAtQ dronePid
+      cpuInfo <- liftIO $ readProcess "grep" ["model name", "/proc/cpuinfo"] ""
+      send queen $ DRegisterAtQ dronePid (tail . dropWhile (/= ':') . takeWhile (/= '\n') $ cpuInfo)
       QRegisteredD scheduler logger <- expect
       link queen
-      say "This drone is running..."
-      droneLoop $ DroneState queen scheduler logger
+      loop $ DroneState queen scheduler logger
     Nothing -> liftIO . putStrLn $ "No Queen found... Terminating..."
   where
-    droneLoop :: DroneState -> Process ()
-    droneLoop state@(DroneState queen scheduler _logger) = do
+    loop :: DroneState -> Process ()
+    loop state@(DroneState queen scheduler _logger) = do
       send queen $ StrMsg "Entering drone loop..."
       dronePid <- getSelfPid
       send scheduler $ DWorkRequestS dronePid
@@ -55,9 +57,9 @@ startDrone backend = do
                       send queen $ StrMsg "Closure unpacked..."
                       proc
                       send queen $ StrMsg "Closure executed..."
-                      droneLoop state
+                      loop state
                   
                   , matchUnknown $ do
                       say "Unknown message received. Discarding..."
-                      droneLoop state
+                      loop state
                   ]

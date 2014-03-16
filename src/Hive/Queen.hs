@@ -1,7 +1,7 @@
-{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE ScopedTypeVariables, RecordWildCards #-}
 
 module Hive.Queen
-  ( startQueen
+  ( runQueen
   , searchQueen
   ) where
 
@@ -10,6 +10,7 @@ import Control.Distributed.Process.Backend.SimpleLocalnet
 
 import Data.Text (unpack)
 import Data.Set as Set
+import Data.Map as Map
 
 import Hive.Types
 import Hive.Messages
@@ -18,53 +19,62 @@ import Hive.Scheduler
 
 -------------------------------------------------------------------------------
 
-data QueenState = QueenState Scheduler Logger (Set Drone)
+data QueenState = QueenState { scheduler :: Scheduler
+                             , logger    :: Logger
+                             , drones    :: Set Drone
+                             , cpuInfos  :: Map Drone CPUInfo
+                             }
   deriving (Show)
 
 -------------------------------------------------------------------------------
 
-startQueen :: Backend -> Process ()
-startQueen _backend = do
+runQueen :: Backend -> Process ()
+runQueen _backend = do
   queen     <- getSelfPid
   register "queen" queen
-  logger    <- spawnLocal $ startLogger    queen
-  scheduler <- spawnLocal $ startScheduler queen logger
+  logger    <- spawnLocal $ runLogger    queen
+  scheduler <- spawnLocal $ runScheduler queen logger
   say $ "Queen     is at " ++ show queen
   say $ "Logger    is at " ++ show logger
   say $ "Scheduler is at " ++ show scheduler
-  serverLoop $ QueenState scheduler logger Set.empty
+  loop $ QueenState scheduler logger Set.empty Map.empty
     where
-      serverLoop :: QueenState -> Process ()
-      serverLoop state@(QueenState scheduler logger drones) =
+      loop :: QueenState -> Process ()
+      loop state@(QueenState {..}) =
         receiveWait [ match $ \(IntMsg n) -> do
                         say $ "Received IntMsg: " ++ show n
-                        serverLoop state
+                        loop state
 
                     , match $ \(ChrMsg c) -> do
                         say $ "Received ChrMsg: " ++ [c]
-                        serverLoop state
+                        loop state
 
                     , match $ \(StrMsg s) -> do
                         say $ "Received StrMsg: " ++ s
-                        serverLoop state
+                        loop state
 
                     , match $ \(TxtMsg t) -> do
                         say $ "Received TxtMsg: " ++ unpack t
-                        serverLoop state
+                        loop state
 
-                    , match $ \(DRegisterAtQ drone) -> do
+                    , match $ \(DRegisterAtQ drone cpuInfo) -> do
                         say $ "Drone registered at " ++ show drone
                         send drone $ QRegisteredD scheduler logger
-                        serverLoop $ QueenState scheduler logger (drone `insert` drones)
+                        send scheduler $ QNewDroneS drone
+                        loop $ QueenState scheduler logger (drone `Set.insert` drones) (Map.insert drone cpuInfo cpuInfos)
 
                     , match $ \(CSolveProblemQ problem) -> do
                         say "Solve request received..."
                         send scheduler $ QEnqueProblemS problem
-                        serverLoop state
+                        loop state
+
+                    , match $ \(CGetStatisticsQ client) -> do
+                        send client $ QStatisticsC . Statistics $ Map.elems cpuInfos
+                        loop state
 
                     , matchUnknown $ do 
                         say "Unknown message received. Discarding..."
-                        serverLoop state
+                        loop state
                     ]
 
 searchQueen :: Backend -> Process QueenSearchReply

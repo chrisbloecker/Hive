@@ -3,7 +3,7 @@ module Hive.Commander
 
 import Control.Distributed.Process (Process, link, send)
 
-import Hive.Types
+import Hive.Types    (Queen, Scheduler, Client, Problem (Problem), Instance (Instance), ProblemType (..), Solution (..))
 import Hive.Messages (StrMsg (..), SSolutionC (..))
 
 import qualified Hive.Problem.TSP.Warrior  as TSPW

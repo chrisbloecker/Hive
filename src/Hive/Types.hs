@@ -7,13 +7,15 @@ module Hive.Types
   , Client
   , Scheduler
   , Logger
+  , CPUInfo
   , Task (..)
-  , Problem(Problem)
+  , Statistics (..)
+  , Problem (..)
   , ProblemType (..)  -- reexporting
   , Instance (..)
   , Solution (..)
   , QueenSearchReply  -- ToDo: Why here?
-  , ClientRequest(ClientRequest)
+  , ClientRequest (..)
   ) where
 
 -------------------------------------------------------------------------------
@@ -40,13 +42,19 @@ type Client    = ProcessId
 type Scheduler = ProcessId
 type Logger    = ProcessId
 
+type CPUInfo   = String
+
 type QueenSearchReply = Maybe Queen
 
 data ClientRequest = ClientRequest Client Problem      deriving (Generic, Typeable, Show)
 
 data Task          = Task (Closure (Process ()))       deriving (Generic, Typeable, Show)
 
+data Statistics    = Statistics { cpus :: [CPUInfo]
+                                }                      deriving (Generic, Typeable, Show)
+
 -------------------------------------------------------------------------------
 
 $(derive makeBinary ''ClientRequest)
 $(derive makeBinary ''Task)
+$(derive makeBinary ''Statistics)

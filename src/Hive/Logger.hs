@@ -1,12 +1,14 @@
 module Hive.Logger
-  ( startLogger
+  ( runLogger
   ) where
 
-import Control.Distributed.Process
+import Control.Distributed.Process (Process, link)
 
-import Hive.Types
+import Hive.Types                  (Queen)
 
-startLogger :: Queen -> Process ()
-startLogger queenPid = do
+-------------------------------------------------------------------------------
+
+runLogger :: Queen -> Process ()
+runLogger queenPid = do
   link queenPid
   return ()
