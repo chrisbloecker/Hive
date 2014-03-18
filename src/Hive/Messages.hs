@@ -72,7 +72,7 @@ data SSendSolutionW     = SSendSolutionW                         deriving (Gener
 
 -- messages from warrior
 data WTaskS             = WTaskS Warrior Task                    deriving (Generic, Typeable, Show)
-data WGiveMeDronesS     = WGiveMeDronesS Integer                 deriving (Generic, Typeable, Show)
+data WGiveMeDronesS     = WGiveMeDronesS Warrior Integer         deriving (Generic, Typeable, Show)
 
 -- messages from queen
 data QRegisteredD       = QRegisteredD Scheduler Logger          deriving (Generic, Typeable, Show)

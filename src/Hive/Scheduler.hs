@@ -6,7 +6,8 @@ module Hive.Scheduler
 
 -------------------------------------------------------------------------------
 
-import Control.Distributed.Process  (Process, link, receiveWait, match, matchIf, say, send, getSelfPid, spawnLocal)
+import Control.Distributed.Process  ( Process, link, receiveWait, match, matchIf
+                                    , say, send, getSelfPid, spawnLocal)
 
 import Data.List                    (delete)
 import Data.Map                     (Map)
@@ -14,7 +15,9 @@ import qualified Data.Map as M      (empty, insert, lookup, delete)
 
 import Hive.Commander
 import Hive.Types                   (Queen, Drone, Logger, Task, ClientRequest (..))
-import Hive.Messages                (QEnqueProblemS (..), DWorkRequestS (..), SWorkReplyD (..), WTaskS (..), SSendSolutionW (..), QNewDroneS (..), QDroneDisappearedS (..))
+import Hive.Messages                ( QEnqueProblemS (..), DWorkRequestS (..), SWorkReplyD (..)
+                                    , WTaskS (..), SSendSolutionW (..), QNewDroneS (..)
+                                    , QDroneDisappearedS (..), WGiveMeDronesS (..), SYourDronesW (..))
 
 -------------------------------------------------------------------------------
 
@@ -82,8 +85,13 @@ runScheduler queenPid loggerPid = do
                         let task = M.lookup drone taskAllocation
                         loop . delTaskAllocation drone . resetTask task . delBusyDrone drone . delAvailableDrone drone $ state
 
+                    , match $ \(WGiveMeDronesS warrior amount) -> do
+                        let drones = take (fromIntegral amount) availableDrones
+                        send warrior $ SYourDronesW drones
+                        loop . foldr ((.) . (\d -> addBusyDrone d . delAvailableDrone d)) id drones $ state
+
                     -- request from a coordinator to add a new task
-                    , match $ \(WTaskS _commander task) ->
+                    , match $ \(WTaskS _warrior task) ->
                         loop . addTask task $ state
 
                     -- if there are tasks, we can supply drones with work

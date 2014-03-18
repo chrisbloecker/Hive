@@ -15,6 +15,7 @@ module Hive.Problem.Data.Internal.Graph
   , neighbours
   , pathLength
   , shorterPath
+  , partition
   ) where
 
 import Data.Binary         (Binary, get, put, putWord8, getWord8)
@@ -23,22 +24,22 @@ import Data.Typeable       (Typeable)
 import GHC.Generics        (Generic)
 
 import Data.List           ((\\))
-import Data.IntMap.Strict  (IntMap, empty, keys)
+import Data.IntMap.Strict  (IntMap)
 import Data.Vector         (Vector)
 import Data.Vector.Binary  ()
 import Control.Applicative (Applicative, (<$>), (<*>))
 
 -------------------------------------------------------------------------------
 
-import qualified Data.Vector                      as Vector   ((!), length, toList, fromList)
-import qualified Data.IntMap.Strict               as Map
+import qualified Data.Vector                      as Vector   ((!), length, toList, fromList, filter)
+import qualified Data.IntMap.Strict               as Map      (empty, singleton, keys, filterWithKey, lookup, insertWith, union, size)
 import qualified Hive.Problem.Data.External.Graph as External (Graph (..), size)
 
 -------------------------------------------------------------------------------
 
 type Size     = Int
 type Node     = Int
-type Distance = Integer
+type Distance = Int
 type Path     = [Node]
 type Position = (Int, Int)
 type Matrix   = IntMap (IntMap Distance)
@@ -57,7 +58,7 @@ $(derive makeBinary ''Graph)
 m <+> n = (+) <$> m <*> n
 
 mkDirectedGraph :: Size -> Graph
-mkDirectedGraph s = DirectedGraph s empty
+mkDirectedGraph s = DirectedGraph s Map.empty
 
 mkGraphFromExternalGraph :: External.Graph -> Graph
 mkGraphFromExternalGraph graph@(External.Graph _ e) =
@@ -95,7 +96,7 @@ updateEdge g@(PositionList  _  ) = addEdge g
 neighbours :: Graph -> Node -> [Node]
 neighbours   (DirectedGraph _ m) from =
   case from `Map.lookup` m of
-    Just m' -> keys m'
+    Just m' -> Map.keys m'
     Nothing -> []
 neighbours g@(PositionList  _  ) from = nodes g \\ [from]
 
@@ -114,3 +115,9 @@ shorterPath g p1 p2 = shorterPath' (p1, f p1) (p2, f p2)
     shorterPath' (_,   Nothing) (p2', Just _ ) = p2'
     shorterPath' (p1', Just l1) (p2', Just l2) | l1 <= l2   = p1'
                                                | otherwise  = p2'
+
+partition :: Graph -> Node -> Node -> Graph
+partition (DirectedGraph _ m) n0 n1 =
+  let m' = Map.filterWithKey (\k _ -> k <= n1 && k > n0) m
+  in  DirectedGraph (Map.size m') m'
+partition (PositionList ps) n0 n1 = PositionList $ Vector.filter (\(x,_) -> x > n0 && x <= n1) ps

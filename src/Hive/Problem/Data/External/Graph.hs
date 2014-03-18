@@ -11,7 +11,7 @@ import Data.Aeson.TH           (deriveJSON, defaultOptions)
 -------------------------------------------------------------------------------
 
 type Node     = Int
-type Distance = Integer
+type Distance = Int
 type Edge     = (Node, Node, Distance)
 type Position = (Int, Int)
 type DistanceEntry = (Node, [(Node,Distance)])
