@@ -26,7 +26,7 @@ newtype Instance = Instance { unInstance :: Text }           deriving (Generic, 
 --newtype Solution = Solution { unSolution :: Text }           deriving (Generic, Typeable, Show)
 
 data Solution = Solution { unSolution :: Text
-                         , unValue    :: Integer
+                         , unValue    :: Int
                          }
               | NoSolution
               | InvalidInput

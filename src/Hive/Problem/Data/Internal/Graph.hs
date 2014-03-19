@@ -7,6 +7,7 @@ module Hive.Problem.Data.Internal.Graph
   , Node
   , mkDirectedGraph
   , mkGraphFromExternalGraph
+  , (<+>)
   , size
   , nodes
   , distance

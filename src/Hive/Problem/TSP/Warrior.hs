@@ -28,7 +28,7 @@ type Worker    = ProcessId
 data Register  = Register Worker                          deriving (Generic, Typeable, Show)
 data SetGraph  = SetGraph Internal.Graph                  deriving (Generic, Typeable, Show)
 data Run       = Run                                      deriving (Generic, Typeable, Show)
-data Candidate = Candidate Worker Integer Internal.Path   deriving (Generic, Typeable, Show)
+data Candidate = Candidate Worker Int Internal.Path       deriving (Generic, Typeable, Show)
 data Terminate = Terminate                                deriving (Generic, Typeable, Show)
 
 data WorkerS   = WorkerS { warrior :: Warrior
@@ -36,7 +36,7 @@ data WorkerS   = WorkerS { warrior :: Warrior
                          } deriving (Eq, Show)
 
 data WarriorS  = WarriorS { taskCount  :: Int
-                          , solutions  :: [(Integer, Internal.Path)]
+                          , solutions  :: [(Int, Internal.Path)]
                           } deriving (Eq, Show)
 
 -------------------------------------------------------------------------------
