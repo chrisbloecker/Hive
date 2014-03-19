@@ -17,7 +17,8 @@ import Hive.Commander
 import Hive.Types                   (Queen, Drone, Logger, Task, ClientRequest (..))
 import Hive.Messages                ( QEnqueProblemS (..), DWorkRequestS (..), SWorkReplyD (..)
                                     , WTaskS (..), SSendSolutionW (..), QNewDroneS (..)
-                                    , QDroneDisappearedS (..), WGiveMeDronesS (..), SYourDronesW (..))
+                                    , QDroneDisappearedS (..), WGiveMeDronesS (..), SYourDronesW (..)
+                                    , DAvailableS (..))
 
 -------------------------------------------------------------------------------
 
@@ -93,6 +94,9 @@ runScheduler queenPid loggerPid = do
                     -- request from a coordinator to add a new task
                     , match $ \(WTaskS _warrior task) ->
                         loop . addTask task $ state
+
+                    , match $ \(DAvailableS drone) ->
+                        loop . addAvailableDrone drone . delBusyDrone drone $ state
 
                     -- if there are tasks, we can supply drones with work
                     , matchIf (\_ -> not . null $ queue) $ \(DWorkRequestS drone) -> do

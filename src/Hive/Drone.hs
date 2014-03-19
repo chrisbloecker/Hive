@@ -22,6 +22,7 @@ import Hive.Messages               ( QRegisteredD (..)
                                    , DRegisterAtQ (..)
                                    , SWorkReplyD (..)
                                    , DWorkRequestS (..)
+                                   , DAvailableS (..)
                                    , StrMsg (..)
                                    )
 import Hive.Queen                  (searchQueen)
@@ -57,6 +58,7 @@ runDrone backend = do
                       send queen $ StrMsg "Closure unpacked..."
                       proc
                       send queen $ StrMsg "Closure executed..."
+                      send scheduler $ DAvailableS dronePid
                       loop state
                   
                   , matchUnknown $ do

@@ -11,7 +11,7 @@ module Hive.Messages
 -- messages from drones
   , DRegisterAtQ (..)
   , DWorkRequestS (..)
-  , DWorkDoneS (..)
+  , DAvailableS (..)
 
 -- messages from clients
   , CSolveProblemQ (..)
@@ -58,7 +58,8 @@ data TxtMsg             = TxtMsg Text                            deriving (Gener
 -- messages from drones
 data DRegisterAtQ       = DRegisterAtQ Drone String              deriving (Generic, Typeable, Show)
 data DWorkRequestS      = DWorkRequestS Drone                    deriving (Generic, Typeable, Show)
-data DWorkDoneS         = DWorkDoneS Solution Client             deriving (Generic, Typeable, Show)
+--data DWorkDoneS         = DWorkDoneS Solution Client             deriving (Generic, Typeable, Show)
+data DAvailableS        = DAvailableS Drone                      deriving (Generic, Typeable, Show)
 
 -- messages from clients
 data CSolveProblemQ     = CSolveProblemQ ClientRequest           deriving (Generic, Typeable, Show)
@@ -91,7 +92,7 @@ $(derive makeBinary ''TxtMsg)
 
 $(derive makeBinary ''DRegisterAtQ)
 $(derive makeBinary ''DWorkRequestS)
-$(derive makeBinary ''DWorkDoneS)
+$(derive makeBinary ''DAvailableS)
 
 $(derive makeBinary ''CSolveProblemQ)
 $(derive makeBinary ''CGetStatisticsQ)
