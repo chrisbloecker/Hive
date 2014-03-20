@@ -63,16 +63,13 @@ $(derive makeBinary ''Part)
 
 -------------------------------------------------------------------------------
 
-sendAll :: (Binary a, Typeable a, Generic a) => [Worker] -> a -> Process ()
-sendAll ws msg = forM_ ws $ \w -> send w msg
-
 worker :: Warrior -> Process ()
 worker warriorPid = do
   self <- getSelfPid
   send warriorPid $ Register self
   -- init all others but self
   (InitMsg droneVector indicator graphPartition) <- expect
-  sendAll (filter (/= self) droneVector) $ Update Map.empty
+  forM_ (filter (/= self) droneVector) $ \w -> send w $ Update Map.empty
   workerLoop $ WorkerS warriorPid droneVector indicator graphPartition Map.empty
     where
       workerLoop :: WorkerS -> Process ()
@@ -119,7 +116,7 @@ run queen scheduler client graph = do
   self <- getSelfPid
   send scheduler $ WGiveMeDronesS self (round . (log :: Double -> Double) . fromIntegral $ Internal.size graph')
   (SYourDronesW drones) <- expect
-  sendAll drones $ SWorkReplyD . Task $ $(mkClosure 'worker) (self :: Warrior, queen) -- ToDo: this message should not be generated here
+  forM_ drones $ \d -> send d $ SWorkReplyD . Task $ $(mkClosure 'worker) (self :: Warrior, queen) -- ToDo: this message should not be generated here
   ws <- collectWorker (length drones) []
   initWorkers ws graph'
   loop $ WarriorS ws
@@ -150,3 +147,6 @@ run queen scheduler client graph = do
 
       waitForWorkers :: Int -> Process Bool
       waitForWorkers n = liftM or $ mapM (\_ -> do {Tock b <- expect; return b}) [1..n]
+
+sendAll :: (Binary a, Typeable a, Generic a) => [Worker] -> a -> Process ()
+sendAll ws msg = forM_ ws $ \w -> send w msg
