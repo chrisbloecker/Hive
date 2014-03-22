@@ -20,7 +20,7 @@ import Data.DeriveTH     (derive, makeBinary)
 import GHC.Generics      (Generic)
 
 import Hive.Types            (Queen, Warrior, Scheduler, Client, Task (..), Solution (..))
-import Hive.Messages         (WGiveMeDronesS (..), SYourDronesW (..), SWorkReplyD (..), SSolutionC (..))
+import Hive.Messages         (WGiveMeDronesS (..), SYourDronesW (..), SWorkReplyD (..), SSolutionC (..), StrMsg (..))
 
 import qualified Data.IntMap as Map  ( empty, unionWith, differenceWith, keys, fromListWith, intersectionWith, mapMaybe
                                      , filterWithKey, singleton, union, (\\), lookup)
@@ -118,7 +118,9 @@ run queen scheduler client graph = do
   (SYourDronesW drones) <- expect
   forM_ drones $ \d -> send d $ SWorkReplyD . Task $ $(mkClosure 'worker) (self :: Warrior, queen) -- ToDo: this message should not be generated here
   ws <- collectWorker (length drones) []
+  send queen $ StrMsg "Initiating workers..."
   initWorkers ws graph'
+  send queen $ StrMsg "Workers initiated..."
   loop $ WarriorS ws
     where
       loop :: WarriorS -> Process ()
@@ -135,8 +137,14 @@ run queen scheduler client graph = do
       initWorkers :: [Worker] -> Internal.Graph -> Process ()
       initWorkers ws g = do
         let ps = Internal.size g `div` length ws -- partitionSize
-        forM_ (zip [1..] ws) $ \(n, w) -> send w $ InitMsg ws (fromIntegral ps) (Internal.partition g ((n-1)*ps) (n*ps))
+        send queen $ StrMsg $ "Graph size is " ++ show (Internal.size g) ++ ", Partition size is " ++ show ps
+        forM_ (zip [1..] ws) $ \(n, w) -> do
+          let partition = Internal.partition g ((n-1)*ps) (n*ps)
+          send queen $ StrMsg $ "Sending partition to " ++ show w
+          send w $ InitMsg ws (fromIntegral ps) partition
+        send queen $ StrMsg "Init messages sent..."
         mapM_ (uncurry send) $ zip ws ((Update $ Map.singleton 1 0) : repeat (Update Map.empty))
+        send queen $ StrMsg "Initial updates sent..."
         return ()
 
       collectWorker :: Int -> [Worker] -> Process [Worker]

@@ -45,7 +45,7 @@ type Path     = [Node]
 type Position = (Int, Int)
 type Matrix   = IntMap (IntMap Distance)
 
-data Graph = DirectedGraph Size Matrix
+data Graph = DirectedGraph Size !Matrix
            | PositionList  (Vector Position)
   deriving (Eq, Show, Generic, Typeable)
 
