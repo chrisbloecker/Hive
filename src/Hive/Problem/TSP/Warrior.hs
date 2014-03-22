@@ -19,24 +19,24 @@ import Hive.Types            (Queen, Warrior, Scheduler, Client, Task (..))
 import Hive.Problem.Types    (Solution (..))
 import Hive.Messages         (WTaskS (..), StrMsg (..), SSolutionC (..), SSendSolutionW (..))
 import Hive.Problem.TSP.Permutation (shuffle)
-import qualified Hive.Problem.Data.External.Graph as External (Graph)
-import qualified Hive.Problem.Data.Internal.Graph as Internal (Graph, Path, size, mkGraphFromExternalGraph, pathLength, shorterPath)
+
+import Hive.Problem.Data.Graph (Graph, Path, size, pathLength, shorterPath)
 
 -------------------------------------------------------------------------------
 
 type Worker    = ProcessId
-data Register  = Register Worker                          deriving (Generic, Typeable, Show)
-data SetGraph  = SetGraph Internal.Graph                  deriving (Generic, Typeable, Show)
-data Run       = Run                                      deriving (Generic, Typeable, Show)
-data Candidate = Candidate Worker Int Internal.Path       deriving (Generic, Typeable, Show)
-data Terminate = Terminate                                deriving (Generic, Typeable, Show)
+data Register  = Register Worker                 deriving (Generic, Typeable, Show)
+data SetGraph  = SetGraph Graph                  deriving (Generic, Typeable, Show)
+data Run       = Run                             deriving (Generic, Typeable, Show)
+data Candidate = Candidate Worker Int Path       deriving (Generic, Typeable, Show)
+data Terminate = Terminate                       deriving (Generic, Typeable, Show)
 
 data WorkerS   = WorkerS { warrior :: Warrior
-                         , graph   :: Internal.Graph
+                         , graph   :: Graph
                          } deriving (Eq, Show)
 
 data WarriorS  = WarriorS { taskCount  :: Int
-                          , solutions  :: [(Int, Internal.Path)]
+                          , solutions  :: [(Int, Path)]
                           } deriving (Eq, Show)
 
 -------------------------------------------------------------------------------
@@ -49,7 +49,7 @@ $(derive makeBinary ''Terminate)
 
 -------------------------------------------------------------------------------
 
-worker :: (Warrior, Internal.Graph) -> Process ()
+worker :: (Warrior, Graph) -> Process ()
 worker (warriorPid, graphIn) = do
   self <- getSelfPid
   send warriorPid $ Register self
@@ -62,11 +62,11 @@ worker (warriorPid, graphIn) = do
                         workerLoop $ state { graph = g }
 
                     , match $ \Run -> do
-                        let solve = (liftIO . shuffle) [0 .. (Internal.size graph - 1)]
+                        let solve = (liftIO . shuffle) [0 .. (size graph - 1)]
                         solutions <- mapM (const solve) ([1..10000] :: [Integer])
-                        let solution = foldr (Internal.shorterPath graph) (head solutions) (tail solutions)
+                        let solution = foldr (shorterPath graph) (head solutions) (tail solutions)
                         self <- getSelfPid
-                        case Internal.pathLength graph solution of
+                        case pathLength graph solution of
                           Just distance -> send warrior $ Candidate self distance solution
                           Nothing       -> send warrior $ Candidate self 0 []
                         workerLoop state
@@ -79,13 +79,12 @@ remotable ['worker]
 
 -------------------------------------------------------------------------------
 
-run :: Queen -> Scheduler -> Client -> External.Graph -> Process ()
+run :: Queen -> Scheduler -> Client -> Graph -> Process ()
 run queen scheduler client graph = do
   send queen $ StrMsg "New Warrior up!"
-  let graph' = Internal.mkGraphFromExternalGraph graph
   self <- getSelfPid
-  let task = Task ($(mkClosure 'worker) (self :: Warrior, graph'))
-  let taskCount = Internal.size graph' `div` 25 + 1
+  let task = Task ($(mkClosure 'worker) (self :: Warrior, graph))
+  let taskCount = size graph `div` 25 + 1
   forM_ [1..taskCount] $ \_ -> send scheduler $ WTaskS self task
   loop $ WarriorS taskCount []
     where

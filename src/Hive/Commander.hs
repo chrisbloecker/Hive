@@ -1,7 +1,9 @@
 module Hive.Commander
   where
 
-import Control.Distributed.Process (Process, link, send)
+import Data.Time      (getCurrentTime, diffUTCTime)
+
+import Control.Distributed.Process (Process, link, send, liftIO)
 
 import Hive.Types    (Queen, Scheduler, Client, Problem (Problem), Instance (Instance), ProblemType (..), Solution (..))
 import Hive.Messages (StrMsg (..), SSolutionC (..))
@@ -9,7 +11,7 @@ import Hive.Messages (StrMsg (..), SSolutionC (..))
 import qualified Hive.Problem.TSP.Warrior  as TSPW
 import qualified Hive.Problem.SSSP.Warrior as SSSPW
 
-import qualified Hive.Problem.Data.External.Graph as Graph (parse)
+import qualified Hive.Problem.Data.Graph as Graph (parse)
 
 -------------------------------------------------------------------------------
 
@@ -27,7 +29,7 @@ startCommander queenPid schedulerPid clientPid (Problem problemType (Instance in
     TSP  -> case Graph.parse inst of
       Just graph -> TSPW.run queenPid schedulerPid clientPid graph
       Nothing    -> send clientPid $ SSolutionC InvalidInput -- ToDo: This message shouldn't be used here
-    SSSP -> case Graph.parse inst of
+    SSSP -> case Graph.parse inst of 
       Just graph -> SSSPW.run queenPid schedulerPid clientPid graph
       Nothing    -> send clientPid $ SSolutionC InvalidInput -- ToDo: This message shouldn't be used here
     APSP -> send clientPid $ SSolutionC NotImplemented

@@ -8,7 +8,7 @@ import System.Random     (randomRIO)
 import Data.Array.IO     (IOArray)
 import Data.Array.MArray (readArray, writeArray, newListArray)
 
-import Hive.Problem.Data.Internal.Graph (Graph, Path, shorterPath)
+import Hive.Problem.Data.Graph (Graph, Path, shorterPath)
 
 -------------------------------------------------------------------------------
 
