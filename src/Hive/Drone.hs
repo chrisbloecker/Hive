@@ -17,6 +17,7 @@ import Hive.Types                  ( Queen
                                    , Scheduler
                                    , Logger
                                    , Task (..)
+                                   , Timeout
                                    )
 import Hive.Messages               ( QRegisteredD (..)
                                    , DRegisterAtQ (..)
@@ -34,10 +35,10 @@ data DroneState = DroneState Queen Scheduler Logger
 
 -------------------------------------------------------------------------------
 
-runDrone :: Backend -> Process ()
-runDrone backend = do
+runDrone :: Backend -> Timeout -> Process ()
+runDrone backend timeout = do
   dronePid <- getSelfPid
-  queenPid <- searchQueen backend
+  queenPid <- searchQueen backend timeout
   case queenPid of
     Just queen -> do
       cpuInfo <- liftIO $ readProcess "grep" ["model name", "/proc/cpuinfo"] ""

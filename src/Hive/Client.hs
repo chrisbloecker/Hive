@@ -16,6 +16,8 @@ import Hive.Types    ( Problem
                      , Statistics (..)
                      , Solution (..)
                      , ClientRequest (..)
+                     , Timeout
+                     , unTimeout
                      )
 import Hive.Messages ( CSolveProblemQ (..)
                      , SSolutionC (..)
@@ -26,15 +28,15 @@ import Hive.Queen    (searchQueen)
 
 -------------------------------------------------------------------------------
 
-solveRequest :: Backend -> Problem -> MVar Solution -> Int -> Process ()
-solveRequest backend problem mvar timeout = do
+solveRequest :: Backend -> Problem -> MVar Solution -> Timeout -> Timeout -> Process ()
+solveRequest backend problem mvar timeout waitForResult = do
   self     <- getSelfPid
-  queenPid <- searchQueen backend
+  queenPid <- searchQueen backend timeout
   case queenPid of
     Just queen -> do
       liftIO . putStrLn $ "Queen found at " ++ show queen
       send queen $ CSolveProblemQ $ ClientRequest self problem
-      _ <- receiveTimeout timeout
+      _ <- receiveTimeout (unTimeout waitForResult)
                           [ match $ \(SSolutionC solution) ->
                               liftIO . putMVar mvar $ solution
                           ]
@@ -42,14 +44,14 @@ solveRequest backend problem mvar timeout = do
       return ()
     Nothing -> error "No Queen found... Terminating..."
 
-getStatistics :: Backend -> MVar Statistics -> Int -> Process ()
-getStatistics backend mvar timeout = do
+getStatistics :: Backend -> MVar Statistics -> Timeout -> Timeout -> Process ()
+getStatistics backend mvar timeout waitForResult = do
   self     <- getSelfPid
-  queenPid <- searchQueen backend
+  queenPid <- searchQueen backend timeout
   case queenPid of
     Just queen -> do
       send queen $ CGetStatisticsQ self
-      _ <- receiveTimeout timeout
+      _ <- receiveTimeout (unTimeout waitForResult)
                           [ match $ \(QStatisticsC statistics) ->
                               liftIO . putMVar mvar $ statistics
                           ]

@@ -7,6 +7,8 @@ module Hive.Types
   , Client
   , Scheduler
   , Logger
+  , Timeout (unTimeout)
+  , milliseconds, seconds, minutes, hours
   , CPUInfo
   , Task (..)
   , Statistics (..)
@@ -14,7 +16,6 @@ module Hive.Types
   , ProblemType (..)  -- reexporting
   , Instance (..)
   , Solution (..)
-  , QueenSearchReply  -- ToDo: Why here?
   , ClientRequest (..)
   ) where
 
@@ -35,6 +36,8 @@ import Hive.Problem.Types      ( ProblemType (..)
 
 -------------------------------------------------------------------------------
 
+newtype Timeout = Timeout { unTimeout :: Int }  deriving (Eq, Show)
+
 type Queen     = ProcessId
 type Drone     = ProcessId
 type Warrior   = ProcessId
@@ -44,10 +47,7 @@ type Logger    = ProcessId
 
 type CPUInfo   = String
 
-type QueenSearchReply = Maybe Queen
-
 data ClientRequest = ClientRequest Client Problem      deriving (Generic, Typeable, Show)
-
 data Task          = Task (Closure (Process ()))       deriving (Generic, Typeable, Show)
 
 data Statistics    = Statistics { cpus :: [CPUInfo]
@@ -58,3 +58,17 @@ data Statistics    = Statistics { cpus :: [CPUInfo]
 $(derive makeBinary ''ClientRequest)
 $(derive makeBinary ''Task)
 $(derive makeBinary ''Statistics)
+
+-------------------------------------------------------------------------------
+
+milliseconds :: Int -> Timeout
+milliseconds ms = Timeout (1000 * ms)
+
+seconds :: Int -> Timeout
+seconds s = milliseconds (1000 * s)
+
+minutes :: Int -> Timeout
+minutes m = seconds (60 * m)
+
+hours :: Int -> Timeout
+hours h = minutes (60 * h)

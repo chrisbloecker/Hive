@@ -23,7 +23,6 @@ data ProblemType  = TSP  -- Traveling Salesman Problem
   deriving (Eq, Show, Enum, Bounded, Generic, Typeable)
 
 newtype Instance = Instance { unInstance :: Text }           deriving (Generic, Typeable, Show)
---newtype Solution = Solution { unSolution :: Text }           deriving (Generic, Typeable, Show)
 
 data Solution = Solution { unSolution :: Text
                          , unValue    :: Int

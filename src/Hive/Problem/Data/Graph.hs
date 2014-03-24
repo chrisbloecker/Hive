@@ -27,7 +27,7 @@ import Data.DeriveTH       (derive, makeBinary)
 import Data.Typeable       (Typeable)
 import GHC.Generics        (Generic)
 
-import Data.Aeson          (decode)
+import Data.Aeson          (decode')
 import Data.Aeson.TH       (deriveJSON, defaultOptions)
 
 import Data.List           ((\\))
@@ -120,4 +120,4 @@ partition (PositionList ps) n0 n1 = PositionList $ Map.filterWithKey (\k _ -> k 
 -------------------------------------------------------------------------------
 
 parse :: Text -> Maybe Graph
-parse = decode . encodeUtf8
+parse = decode' . encodeUtf8
