@@ -31,7 +31,9 @@ library
                        process,
                        time,
                        distributed-process >= 0.4 && < 0.5,
-                       distributed-process-simplelocalnet >= 0.2 && < 0.3,
+                       network-transport,
+                       network-transport-tcp,
+                       --distributed-process-simplelocalnet >= 0.2 && < 0.3,
                        binary >= 0.5 && < 0.6,
                        derive >= 2.5 && < 2.6
   -- Compatibility with previous GHC versions.

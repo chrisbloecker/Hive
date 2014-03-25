@@ -8,8 +8,11 @@ module Hive.Drone
 
 import System.Process  (readProcess)
 
-import Control.Distributed.Process                        (Process, getSelfPid, link, send, expect,receiveWait, match, matchUnknown, unClosure, liftIO, say)
-import Control.Distributed.Process.Backend.SimpleLocalnet (Backend)
+import Data.ByteString.Char8 (pack)
+
+import Network.Transport (EndPointAddress(..))
+import Control.Distributed.Process (Process, WhereIsReply(..), getSelfPid, link, send, expect,receiveWait, match, matchUnknown, unClosure, liftIO, say, whereisRemoteAsync)
+import Control.Distributed.Process.Internal.Types (NodeId(..))
 
 -------------------------------------------------------------------------------
 
@@ -17,7 +20,6 @@ import Hive.Types                  ( Queen
                                    , Scheduler
                                    , Logger
                                    , Task (..)
-                                   , Timeout
                                    )
 import Hive.Messages               ( QRegisteredD (..)
                                    , DRegisterAtQ (..)
@@ -26,7 +28,6 @@ import Hive.Messages               ( QRegisteredD (..)
                                    , DAvailableS (..)
                                    , StrMsg (..)
                                    )
-import Hive.Queen                  (searchQueen)
 
 -------------------------------------------------------------------------------
 
@@ -35,10 +36,11 @@ data DroneState = DroneState Queen Scheduler Logger
 
 -------------------------------------------------------------------------------
 
-runDrone :: Backend -> Timeout -> Process ()
-runDrone backend timeout = do
+runDrone :: String -> Process ()
+runDrone queenAddr = do
   dronePid <- getSelfPid
-  queenPid <- searchQueen backend timeout
+  whereisRemoteAsync (NodeId . EndPointAddress $ pack queenAddr) "queen"
+  (WhereIsReply _ queenPid) <- expect
   case queenPid of
     Just queen -> do
       cpuInfo <- liftIO $ readProcess "grep" ["model name", "/proc/cpuinfo"] ""

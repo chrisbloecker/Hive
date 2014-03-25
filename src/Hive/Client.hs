@@ -7,8 +7,11 @@ module Hive.Client
 
 -------------------------------------------------------------------------------
 
-import Control.Distributed.Process.Backend.SimpleLocalnet (Backend)
-import Control.Distributed.Process                        (Process, getSelfPid, liftIO, send, receiveTimeout, match)
+import Data.ByteString.Char8 (pack)
+
+import Network.Transport (EndPointAddress(..))
+import Control.Distributed.Process (Process, WhereIsReply(..), getSelfPid, liftIO, send, receiveTimeout, match, whereisRemoteAsync, expect)
+import Control.Distributed.Process.Internal.Types (NodeId(..))
 
 import Control.Concurrent.MVar (MVar, putMVar, tryPutMVar)
 
@@ -24,14 +27,14 @@ import Hive.Messages ( CSolveProblemQ (..)
                      , QStatisticsC (..)
                      , CGetStatisticsQ (..)
                      )
-import Hive.Queen    (searchQueen)
 
 -------------------------------------------------------------------------------
 
-solveRequest :: Backend -> Problem -> MVar Solution -> Timeout -> Timeout -> Process ()
-solveRequest backend problem mvar timeout waitForResult = do
+solveRequest :: String -> Problem -> MVar Solution -> Timeout -> Process ()
+solveRequest queenAddr problem mvar waitForResult = do
   self     <- getSelfPid
-  queenPid <- searchQueen backend timeout
+  whereisRemoteAsync (NodeId . EndPointAddress $ pack queenAddr) "queen"
+  (WhereIsReply _ queenPid) <- expect
   case queenPid of
     Just queen -> do
       liftIO . putStrLn $ "Queen found at " ++ show queen
@@ -44,10 +47,11 @@ solveRequest backend problem mvar timeout waitForResult = do
       return ()
     Nothing -> error "No Queen found... Terminating..."
 
-getStatistics :: Backend -> MVar Statistics -> Timeout -> Timeout -> Process ()
-getStatistics backend mvar timeout waitForResult = do
+getStatistics :: String -> MVar Statistics -> Timeout -> Process ()
+getStatistics queenAddr mvar waitForResult = do
   self     <- getSelfPid
-  queenPid <- searchQueen backend timeout
+  whereisRemoteAsync (NodeId . EndPointAddress $ pack queenAddr) "queen"
+  (WhereIsReply _ queenPid) <- expect
   case queenPid of
     Just queen -> do
       send queen $ CGetStatisticsQ self

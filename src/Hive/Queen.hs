@@ -3,11 +3,10 @@
 module Hive.Queen
   ( QueenSearchReply
   , runQueen
-  , searchQueen
+--  , searchQueen
   ) where
 
 import Control.Distributed.Process
-import Control.Distributed.Process.Backend.SimpleLocalnet
 
 import Data.Set as Set
 import Data.Map as Map
@@ -30,8 +29,8 @@ data QueenState = QueenState { scheduler :: Scheduler
 
 -------------------------------------------------------------------------------
 
-runQueen :: Backend -> Process ()
-runQueen _backend = do
+runQueen ::Process ()
+runQueen = do
   queen     <- getSelfPid
   register "queen" queen
   logger    <- spawnLocal $ runLogger    queen
@@ -73,9 +72,10 @@ runQueen _backend = do
                         loop state
                     ]
 
-searchQueen :: Backend -> Timeout -> Process QueenSearchReply
-searchQueen backend timeout =
-  searchQueen' =<< liftIO (findPeers backend (unTimeout timeout))
+{-
+searchQueen :: Transport -> Timeout -> Process QueenSearchReply
+searchQueen transport timeout =
+  searchQueen' =<< liftIO (findPeers transport (unTimeout timeout))
     where
       searchQueen' :: [NodeId] -> Process QueenSearchReply
       searchQueen' (peer:ps) = do
@@ -85,3 +85,4 @@ searchQueen backend timeout =
           Just queenPid -> return (Just queenPid)
           Nothing       -> searchQueen' ps
       searchQueen' [] = return Nothing
+      -}
