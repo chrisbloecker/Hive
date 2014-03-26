@@ -6,10 +6,9 @@ module Hive.Drone
 
 -------------------------------------------------------------------------------
 
-import System.Process  (readProcess)
-
-import Control.Distributed.Process                        (Process, getSelfPid, link, send, expect,receiveWait, match, matchUnknown, unClosure, liftIO, say)
-import Control.Distributed.Process.Backend.SimpleLocalnet (Backend)
+import System.Process (readProcess)
+import Control.Distributed.Process ( Process, getSelfPid, link, send, expect,receiveWait, match
+                                   , matchUnknown, unClosure, liftIO, say)
 
 -------------------------------------------------------------------------------
 
@@ -17,7 +16,7 @@ import Hive.Types                  ( Queen
                                    , Scheduler
                                    , Logger
                                    , Task (..)
-                                   , Timeout
+                                   , milliseconds
                                    )
 import Hive.Messages               ( QRegisteredD (..)
                                    , DRegisterAtQ (..)
@@ -26,7 +25,7 @@ import Hive.Messages               ( QRegisteredD (..)
                                    , DAvailableS (..)
                                    , StrMsg (..)
                                    )
-import Hive.Queen                  (searchQueen)
+import Hive.NetworkUtils (whereisRemote)
 
 -------------------------------------------------------------------------------
 
@@ -35,10 +34,10 @@ data DroneState = DroneState Queen Scheduler Logger
 
 -------------------------------------------------------------------------------
 
-runDrone :: Backend -> Timeout -> Process ()
-runDrone backend timeout = do
+runDrone :: String -> String -> Process ()
+runDrone queenHost queenPort = do
   dronePid <- getSelfPid
-  queenPid <- searchQueen backend timeout
+  queenPid <- whereisRemote queenHost queenPort "queen" (milliseconds 500)
   case queenPid of
     Just queen -> do
       cpuInfo <- liftIO $ readProcess "grep" ["model name", "/proc/cpuinfo"] ""

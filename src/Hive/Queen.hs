@@ -3,11 +3,21 @@
 module Hive.Queen
   ( QueenSearchReply
   , runQueen
-  , searchQueen
   ) where
 
 import Control.Distributed.Process
-import Control.Distributed.Process.Backend.SimpleLocalnet
+  ( Process
+  , ProcessMonitorNotification(..)
+  , getSelfPid
+  , register
+  , spawnLocal
+  , say
+  , receiveWait
+  , match
+  , matchUnknown
+  , monitor
+  , send
+  )
 
 import Data.Set as Set
 import Data.Map as Map
@@ -30,8 +40,8 @@ data QueenState = QueenState { scheduler :: Scheduler
 
 -------------------------------------------------------------------------------
 
-runQueen :: Backend -> Process ()
-runQueen _backend = do
+runQueen ::Process ()
+runQueen = do
   queen     <- getSelfPid
   register "queen" queen
   logger    <- spawnLocal $ runLogger    queen
@@ -72,16 +82,3 @@ runQueen _backend = do
                         say "Unknown message received. Discarding..."
                         loop state
                     ]
-
-searchQueen :: Backend -> Timeout -> Process QueenSearchReply
-searchQueen backend timeout =
-  searchQueen' =<< liftIO (findPeers backend (unTimeout timeout))
-    where
-      searchQueen' :: [NodeId] -> Process QueenSearchReply
-      searchQueen' (peer:ps) = do
-        whereisRemoteAsync peer "queen"
-        WhereIsReply _name remoteWhereIs <- expect
-        case remoteWhereIs of
-          Just queenPid -> return (Just queenPid)
-          Nothing       -> searchQueen' ps
-      searchQueen' [] = return Nothing

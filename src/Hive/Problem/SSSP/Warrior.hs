@@ -140,6 +140,7 @@ run queen scheduler client graph = do
           send queen $! StrMsg $ "Sending partition to " ++ show w
           start <- liftIO getCurrentTime
           let part = partition g ((n-1)*ps) (n*ps)
+          send queen $ StrMsg $ "Partition is " ++ show ((n-1)*ps, n*ps)
           send w $ InitMsg ws (fromIntegral ps) part
           end <- liftIO getCurrentTime
           send queen $! StrMsg $ "Creating the partition and sending it took " ++ show (diffUTCTime end start)
