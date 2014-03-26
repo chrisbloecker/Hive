@@ -1,5 +1,3 @@
-{-# LANGUAGE OverloadedStrings #-}
-
 module Hive.Client
   ( solveRequest
   , getStatistics
@@ -7,34 +5,19 @@ module Hive.Client
 
 -------------------------------------------------------------------------------
 
-import Data.ByteString.Char8 (pack)
-
-import Network.Transport (EndPointAddress(..))
-import Control.Distributed.Process (Process, WhereIsReply(..), getSelfPid, liftIO, send, receiveTimeout, match, whereisRemoteAsync, expect)
-import Control.Distributed.Process.Internal.Types (NodeId(..))
-
 import Control.Concurrent.MVar (MVar, putMVar, tryPutMVar)
+import Control.Distributed.Process (Process, getSelfPid, liftIO, send, receiveTimeout, match)
 
-import Hive.Types    ( Problem
-                     , Statistics (..)
-                     , Solution (..)
-                     , ClientRequest (..)
-                     , Timeout
-                     , unTimeout
-                     )
-import Hive.Messages ( CSolveProblemQ (..)
-                     , SSolutionC (..)
-                     , QStatisticsC (..)
-                     , CGetStatisticsQ (..)
-                     )
+import Hive.Types (Problem, Statistics (..), Solution (..), ClientRequest (..), Timeout, unTimeout, milliseconds)
+import Hive.Messages (CSolveProblemQ (..), SSolutionC (..), QStatisticsC (..), CGetStatisticsQ (..))
+import Hive.NetworkUtils (whereisRemote)
 
 -------------------------------------------------------------------------------
 
-solveRequest :: String -> Problem -> MVar Solution -> Timeout -> Process ()
-solveRequest queenAddr problem mvar waitForResult = do
+solveRequest :: String -> String -> Problem -> MVar Solution -> Timeout -> Process ()
+solveRequest queenHost queenPort problem mvar waitForResult = do
   self     <- getSelfPid
-  whereisRemoteAsync (NodeId . EndPointAddress $ pack queenAddr) "queen"
-  (WhereIsReply _ queenPid) <- expect
+  queenPid <- whereisRemote queenHost queenPort "queen" (milliseconds 500)
   case queenPid of
     Just queen -> do
       liftIO . putStrLn $ "Queen found at " ++ show queen
@@ -47,11 +30,10 @@ solveRequest queenAddr problem mvar waitForResult = do
       return ()
     Nothing -> error "No Queen found... Terminating..."
 
-getStatistics :: String -> MVar Statistics -> Timeout -> Process ()
-getStatistics queenAddr mvar waitForResult = do
+getStatistics :: String -> String -> MVar Statistics -> Timeout -> Process ()
+getStatistics queenHost queenPort mvar waitForResult = do
   self     <- getSelfPid
-  whereisRemoteAsync (NodeId . EndPointAddress $ pack queenAddr) "queen"
-  (WhereIsReply _ queenPid) <- expect
+  queenPid <- whereisRemote queenHost queenPort "queen" (milliseconds 500)
   case queenPid of
     Just queen -> do
       send queen $ CGetStatisticsQ self

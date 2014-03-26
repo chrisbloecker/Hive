@@ -6,13 +6,9 @@ module Hive.Drone
 
 -------------------------------------------------------------------------------
 
-import System.Process  (readProcess)
-
-import Data.ByteString.Char8 (pack)
-
-import Network.Transport (EndPointAddress(..))
-import Control.Distributed.Process (Process, WhereIsReply(..), getSelfPid, link, send, expect,receiveWait, match, matchUnknown, unClosure, liftIO, say, whereisRemoteAsync)
-import Control.Distributed.Process.Internal.Types (NodeId(..))
+import System.Process (readProcess)
+import Control.Distributed.Process ( Process, getSelfPid, link, send, expect,receiveWait, match
+                                   , matchUnknown, unClosure, liftIO, say)
 
 -------------------------------------------------------------------------------
 
@@ -20,6 +16,7 @@ import Hive.Types                  ( Queen
                                    , Scheduler
                                    , Logger
                                    , Task (..)
+                                   , milliseconds
                                    )
 import Hive.Messages               ( QRegisteredD (..)
                                    , DRegisterAtQ (..)
@@ -28,6 +25,7 @@ import Hive.Messages               ( QRegisteredD (..)
                                    , DAvailableS (..)
                                    , StrMsg (..)
                                    )
+import Hive.NetworkUtils (whereisRemote)
 
 -------------------------------------------------------------------------------
 
@@ -36,11 +34,10 @@ data DroneState = DroneState Queen Scheduler Logger
 
 -------------------------------------------------------------------------------
 
-runDrone :: String -> Process ()
-runDrone queenAddr = do
+runDrone :: String -> String -> Process ()
+runDrone queenHost queenPort = do
   dronePid <- getSelfPid
-  whereisRemoteAsync (NodeId . EndPointAddress $ pack queenAddr) "queen"
-  (WhereIsReply _ queenPid) <- expect
+  queenPid <- whereisRemote queenHost queenPort "queen" (milliseconds 500)
   case queenPid of
     Just queen -> do
       cpuInfo <- liftIO $ readProcess "grep" ["model name", "/proc/cpuinfo"] ""

@@ -49,6 +49,7 @@ library
                        Hive.Commander
                        Hive.Logger
                        Hive.Messages
+                       Hive.NetworkUtils
                        Hive.Problem.TSP.Permutation
                        Hive.Problem.TSP.Warrior
                        Hive.Problem.SSSP.Warrior
