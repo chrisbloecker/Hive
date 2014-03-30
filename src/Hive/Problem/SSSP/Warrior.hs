@@ -5,14 +5,13 @@ module Hive.Problem.SSSP.Warrior
   , __remoteTable
   ) where
 
-import Data.Time      (getCurrentTime, diffUTCTime)
-
-import Control.Distributed.Process         (Process, ProcessId, send, expect, getSelfPid, receiveWait, match, liftIO)
+import Control.Distributed.Process         (Process, ProcessId, send, expect, getSelfPid, receiveWait, match, spawnLocal)
 import Control.Distributed.Process.Closure (remotable, mkClosure)
 
 import Control.Monad     (forM_, liftM)
-import Control.Arrow     ((&&&))
+import Control.Arrow     ((&&&), second)
 
+import Data.List         (unfoldr)
 import Data.Text.Lazy    (pack)
 import Data.Maybe        (isJust)
 import Data.IntMap       (IntMap)
@@ -24,10 +23,10 @@ import GHC.Generics      (Generic)
 import Hive.Types            (Queen, Warrior, Scheduler, Client, Task (..), Solution (..))
 import Hive.Messages         (WGiveMeDronesS (..), SYourDronesW (..), SWorkReplyD (..), SSolutionC (..), StrMsg (..))
 
-import Hive.Problem.Data.Graph (Graph, Node, size, partition, neighbours, distance, (<+>))
+import Hive.Problem.Data.Graph (Graph, Node, size, partitions, neighbours, distance, (<+>))
 
-import qualified Data.IntMap as Map  ( empty, unionWith, differenceWith, keys, fromListWith, intersectionWith, mapMaybe
-                                     , filterWithKey, singleton, union, (\\), lookup)
+import qualified Data.IntMap as Map  ( empty, unionsWith, differenceWith, keys, fromListWith
+                                     , mapMaybe, partitionWithKey, singleton, unions, union, (\\), lookup)
 
 -------------------------------------------------------------------------------
 
@@ -64,12 +63,18 @@ $(derive makeBinary ''Part)
 
 -------------------------------------------------------------------------------
 
+unfoldGraph :: PathLengths -> Int -> Int -> [PathLengths]
+unfoldGraph ps parts indicator =
+  let unF (m, i) = if i < parts then Just . second (id &&& const (i+1)) $! Map.partitionWithKey (\k _ -> k <= (i+1)*indicator) $! m
+                                else Nothing
+  in  unfoldr unF (ps, 0)
+
 worker :: (Warrior, Queen) -> Process ()
 worker (warriorPid, queen) = do
   self <- getSelfPid
   send warriorPid $ Register self
   (InitMsg droneVector indicator graphPartition) <- expect
-  send queen $! StrMsg "Init message received..."
+  send queen $ StrMsg "Init message received..."
   -- init all others but self
   forM_ (filter (/= self) droneVector) $ \w -> send w $ Update Map.empty
   workerLoop $ WorkerS warriorPid droneVector indicator graphPartition Map.empty
@@ -78,7 +83,7 @@ worker (warriorPid, queen) = do
       workerLoop state@(WorkerS {..}) =
         receiveWait [ match $ \Tick -> do
                         (paths', nodes) <- receiveUpdates others paths
-                        sendupdates others nodes indicator paths' vertices
+                        sendUpdates others nodes indicator paths' vertices
                         send warrior $ Tock (not . null $ nodes)
                         workerLoop $ state { paths = paths' }
 
@@ -90,25 +95,24 @@ worker (warriorPid, queen) = do
       receiveUpdates :: [Worker] -> PathLengths -> Process (PathLengths, [Node])
       receiveUpdates ws pls = do
         updateMessages <- mapM (\_ -> do {Update update <- expect; return update}) ws
-        let updates = foldr (Map.unionWith min) Map.empty updateMessages
-        let pls'    = Map.unionWith min pls updates
+        let updates = Map.unionsWith min updateMessages
+        let pls'    = Map.unionsWith min [pls, updates]
         let nodes   = Map.differenceWith (\old new -> if old > new then Just new else Nothing) pls pls' `Map.union` (updates Map.\\ pls)
         return (pls', Map.keys nodes)
 
-      sendupdates :: [Worker] -> [Node] -> Int -> PathLengths -> Graph -> Process ()
-      sendupdates ws ns indicator ps g = do
-        let neighbourNodes = map (id &&& neighbours g) ns
-        let d1 = filter (isJust . snd) $ concatMap (\(from, tos) -> map (id &&& \to -> Map.lookup from ps <+> distance g from to) tos) neighbourNodes
-        let d2 = Map.fromListWith min d1
-        let d3 = Map.mapMaybe id d2
-        let distances = Map.intersectionWith min ps d3 `Map.union` (d3 Map.\\ ps)
-        forM_ (zip [1..] ws) $ \(n, w) -> do
-          let update = Map.filterWithKey (\k _ -> k > (n-1)*indicator && k <= n*indicator) distances
-          send w $ Update update
-          return ()
+      sendUpdates :: [Worker] -> [Node] -> Int -> PathLengths -> Graph -> Process ()
+      sendUpdates ws ns indicator ps g = do
+        let d = Map.mapMaybe id
+              . Map.fromListWith min
+              . filter (isJust . snd)
+              . concatMap (\(from, tos) -> map (id &&& \to -> Map.lookup from ps <+> distance g from to) tos)
+              . map (id &&& neighbours g)
+              $! ns
+        forM_ (zip ws $! unfoldGraph d (length ws) indicator) $ \(w, part) ->
+          send w $ Update part
 
 
-remotable ['worker]
+remotable ['worker, 'unfoldGraph]
 
 -------------------------------------------------------------------------------
 
@@ -131,19 +135,13 @@ run queen scheduler client graph = do
         else do
           sendAll workers Terminate
           parts <- mapM (\_ -> do {Part part <- expect; return part}) workers
-          send client $ SSolutionC $ Solution (pack . show $ foldr Map.union Map.empty parts) 0
+          send client $ SSolutionC $ Solution (pack . show $ Map.unions parts) 0
 
       initWorkers :: [Worker] -> Graph -> Process ()
       initWorkers ws g = do
         let ps = size g `div` length ws -- partitionSize
-        forM_ (zip [1..] ws) $ \(n, w) -> do
-          send queen $! StrMsg $ "Sending partition to " ++ show w
-          start <- liftIO getCurrentTime
-          let part = partition g ((n-1)*ps) (n*ps)
-          send queen $ StrMsg $ "Partition is " ++ show ((n-1)*ps, n*ps)
-          send w $ InitMsg ws (fromIntegral ps) part
-          end <- liftIO getCurrentTime
-          send queen $! StrMsg $ "Creating the partition and sending it took " ++ show (diffUTCTime end start)
+        forM_ (zip ws $! partitions g (length ws) ps) $ \(w, part) ->
+          spawnLocal $ send w $ InitMsg ws (fromIntegral ps) part
         mapM_ (uncurry send) $ zip ws ((Update $ Map.singleton 1 0) : repeat (Update Map.empty))
         return ()
 
