@@ -55,6 +55,7 @@ library
                        Hive.Problem.TSP.Warrior
                        Hive.Problem.SSSP.Warrior
                        Hive.Problem.ANTSP.Warrior
+                       Hive.Problem.ANTSP.Pheromones
                        Hive.Problem.Data.Graph
 --                       Hive.Problem.Data.Internal.Graph
 --                       Hive.Problem.Data.External.Graph

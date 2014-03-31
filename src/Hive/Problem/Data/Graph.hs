@@ -44,7 +44,7 @@ import Data.Monoid         (Monoid(mempty, mappend))
 
 -------------------------------------------------------------------------------
 
-import qualified Data.IntMap.Strict as M ((!), empty, singleton, keys, filterWithKey, lookup, insertWith, union, size, partitionWithKey)
+import qualified Data.IntMap.Strict as M ((!), empty, singleton, keys, filterWithKey, lookup, insertWith, union, unionWith, size, partitionWithKey)
 
 -------------------------------------------------------------------------------
 
@@ -129,8 +129,8 @@ partitions (Graph m) parts indicator =
                                  else Nothing
   in  unfoldr unF (m, 0)
 
-overlay :: Num a => Graph a -> Graph a -> Graph a
-overlay (Graph _m1) (Graph _m2) = undefined
+overlay :: Num a => (a -> a -> a) -> Graph a -> Graph a -> Graph a
+overlay f (Graph m1) (Graph m2) = Graph $ M.unionWith (M.unionWith f) m1 m2
 
 -------------------------------------------------------------------------------
 
