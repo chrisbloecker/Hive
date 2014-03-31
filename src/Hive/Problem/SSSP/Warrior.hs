@@ -5,7 +5,7 @@ module Hive.Problem.SSSP.Warrior
   , __remoteTable
   ) where
 
-import Control.Distributed.Process         (Process, ProcessId, send, expect, getSelfPid, receiveWait, match, spawnLocal)
+import Control.Distributed.Process         (Process, ProcessId, send, expect, getSelfPid, receiveWait, match)
 import Control.Distributed.Process.Closure (remotable, mkClosure)
 
 import Control.Monad     (forM_, liftM)
@@ -21,7 +21,7 @@ import Data.DeriveTH     (derive, makeBinary)
 import GHC.Generics      (Generic)
 
 import Hive.Types            (Queen, Warrior, Scheduler, Client, Task (..), Solution (..))
-import Hive.Messages         (WGiveMeDronesS (..), SYourDronesW (..), SWorkReplyD (..), SSolutionC (..), StrMsg (..))
+import Hive.Messages         (WGiveMeDronesS (..), SYourDronesW (..), SWorkReplyD (..), SSolutionC (..))
 
 import Hive.Problem.Data.Graph (Graph, Node, size, partitions, neighbours, distance, (<+>))
 
@@ -33,18 +33,18 @@ import qualified Data.IntMap as Map  ( empty, unionsWith, differenceWith, keys, 
 type Worker      = ProcessId
 type PathLengths = IntMap Int
 type Updates     = Bool
-data Register    = Register Worker               deriving (Generic, Typeable, Show)
-data InitMsg     = InitMsg [Worker] Int Graph    deriving (Generic, Typeable, Show)
-data Terminate   = Terminate                     deriving (Generic, Typeable, Show)
-data Tick        = Tick                          deriving (Generic, Typeable, Show)
-data Tock        = Tock Updates                  deriving (Generic, Typeable, Show)
-data Update      = Update PathLengths            deriving (Generic, Typeable, Show)
-data Part        = Part PathLengths              deriving (Generic, Typeable, Show)
+data Register    = Register Worker                 deriving (Generic, Typeable, Show)
+data InitMsg a   = InitMsg [Worker] Int (Graph a)  deriving (Generic, Typeable, Show)
+data Terminate   = Terminate                       deriving (Generic, Typeable, Show)
+data Tick        = Tick                            deriving (Generic, Typeable, Show)
+data Tock        = Tock Updates                    deriving (Generic, Typeable, Show)
+data Update      = Update PathLengths              deriving (Generic, Typeable, Show)
+data Part        = Part PathLengths                deriving (Generic, Typeable, Show)
 
-data WorkerS   = WorkerS { warrior   :: Warrior
+data WorkerS a = WorkerS { warrior   :: Warrior
                          , others    :: [Worker]
                          , indicator :: Int
-                         , vertices  :: !Graph
+                         , vertices  :: !(Graph a)
                          , paths     :: !PathLengths
                          } deriving (Eq, Show)
 
@@ -69,17 +69,16 @@ unfoldGraph ps parts indicator =
                                 else Nothing
   in  unfoldr unF (ps, 0)
 
-worker :: (Warrior, Queen) -> Process ()
-worker (warriorPid, queen) = do
+worker :: Warrior -> Process ()
+worker warriorPid = do
   self <- getSelfPid
   send warriorPid $ Register self
   (InitMsg droneVector indicator graphPartition) <- expect
-  send queen $ StrMsg "Init message received..."
   -- init all others but self
   forM_ (filter (/= self) droneVector) $ \w -> send w $ Update Map.empty
   workerLoop $ WorkerS warriorPid droneVector indicator graphPartition Map.empty
     where
-      workerLoop :: WorkerS -> Process ()
+      workerLoop :: WorkerS Int -> Process ()
       workerLoop state@(WorkerS {..}) =
         receiveWait [ match $ \Tick -> do
                         (paths', nodes) <- receiveUpdates others paths
@@ -100,7 +99,7 @@ worker (warriorPid, queen) = do
         let nodes   = Map.differenceWith (\old new -> if old > new then Just new else Nothing) pls pls' `Map.union` (updates Map.\\ pls)
         return (pls', Map.keys nodes)
 
-      sendUpdates :: [Worker] -> [Node] -> Int -> PathLengths -> Graph -> Process ()
+      sendUpdates :: [Worker] -> [Node] -> Int -> PathLengths -> Graph Int -> Process ()
       sendUpdates ws ns indicator ps g = do
         let d = Map.mapMaybe id
               . Map.fromListWith min
@@ -116,12 +115,12 @@ remotable ['worker, 'unfoldGraph]
 
 -------------------------------------------------------------------------------
 
-run :: Queen -> Scheduler -> Client -> Graph -> Process ()
+run :: Queen -> Scheduler -> Client -> Graph Int -> Process ()
 run queen scheduler client graph = do
   self <- getSelfPid
   send scheduler $ WGiveMeDronesS self (round . (log :: Double -> Double) . fromIntegral $ size graph)
   (SYourDronesW drones) <- expect
-  forM_ drones $ \d -> send d $ SWorkReplyD . Task $ $(mkClosure 'worker) (self :: Warrior, queen) -- ToDo: this message should not be generated here
+  forM_ drones $ \d -> send d $ SWorkReplyD . Task $ $(mkClosure 'worker) (self :: Warrior) -- ToDo: this message should not be generated here
   ws <- collectWorker (length drones) []
   initWorkers ws graph
   loop $ WarriorS ws
@@ -137,11 +136,11 @@ run queen scheduler client graph = do
           parts <- mapM (\_ -> do {Part part <- expect; return part}) workers
           send client $ SSolutionC $ Solution (pack . show $ Map.unions parts) 0
 
-      initWorkers :: [Worker] -> Graph -> Process ()
+      initWorkers :: [Worker] -> Graph Int -> Process ()
       initWorkers ws g = do
         let ps = size g `div` length ws -- partitionSize
         forM_ (zip ws $! partitions g (length ws) ps) $ \(w, part) ->
-          spawnLocal $ send w $ InitMsg ws (fromIntegral ps) part
+          send w $ InitMsg ws (fromIntegral ps) part
         mapM_ (uncurry send) $ zip ws ((Update $ Map.singleton 1 0) : repeat (Update Map.empty))
         return ()
 

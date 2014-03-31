@@ -26,7 +26,7 @@ shuffle xs = do
     newArray :: Int -> [a] -> IO (IOArray Int a)
     newArray n' = newListArray (1,n')
 
-combine :: Graph -> [Path] -> Path
+combine :: (Ord a, Num a) => Graph a -> [Path] -> Path
 combine _    []  = []
 combine _ (p:[]) = p
 combine g (p:ps) = foldr (shorterPath g) p ps

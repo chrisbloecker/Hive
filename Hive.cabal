@@ -54,6 +54,7 @@ library
                        Hive.Problem.TSP.Permutation
                        Hive.Problem.TSP.Warrior
                        Hive.Problem.SSSP.Warrior
+                       Hive.Problem.ANTSP.Warrior
                        Hive.Problem.Data.Graph
 --                       Hive.Problem.Data.Internal.Graph
 --                       Hive.Problem.Data.External.Graph

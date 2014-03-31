@@ -24,15 +24,15 @@ import Hive.Problem.Data.Graph (Graph, Path, size, pathLength, shorterPath)
 
 -------------------------------------------------------------------------------
 
-type Worker    = ProcessId
-data Register  = Register Worker                 deriving (Generic, Typeable, Show)
-data SetGraph  = SetGraph Graph                  deriving (Generic, Typeable, Show)
-data Run       = Run                             deriving (Generic, Typeable, Show)
-data Candidate = Candidate Worker Int Path       deriving (Generic, Typeable, Show)
-data Terminate = Terminate                       deriving (Generic, Typeable, Show)
+type Worker     = ProcessId
+data Register   = Register Worker                 deriving (Generic, Typeable, Show)
+data SetGraph a = SetGraph (Graph a)              deriving (Generic, Typeable, Show)
+data Run        = Run                             deriving (Generic, Typeable, Show)
+data Candidate  = Candidate Worker Int Path       deriving (Generic, Typeable, Show)
+data Terminate  = Terminate                       deriving (Generic, Typeable, Show)
 
 data WorkerS   = WorkerS { warrior :: Warrior
-                         , graph   :: Graph
+                         , graph   :: Graph Int
                          } deriving (Eq, Show)
 
 data WarriorS  = WarriorS { taskCount  :: Int
@@ -49,7 +49,7 @@ $(derive makeBinary ''Terminate)
 
 -------------------------------------------------------------------------------
 
-worker :: (Warrior, Graph) -> Process ()
+worker :: (Warrior, Graph Int) -> Process ()
 worker (warriorPid, graphIn) = do
   self <- getSelfPid
   send warriorPid $ Register self
@@ -79,7 +79,7 @@ remotable ['worker]
 
 -------------------------------------------------------------------------------
 
-run :: Queen -> Scheduler -> Client -> Graph -> Process ()
+run :: Queen -> Scheduler -> Client -> Graph Int -> Process ()
 run queen scheduler client graph = do
   send queen $ StrMsg "New Warrior up!"
   self <- getSelfPid
