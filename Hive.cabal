@@ -2,7 +2,7 @@
 --  see http://haskell.org/cabal/users-guide/
 
 name:                Hive
-version:             0.1.1.1
+version:             0.1.1.2
 -- synopsis:            
 -- description:         
 license:             GPL-3
@@ -50,11 +50,9 @@ library
                        Hive.Logger
                        Hive.Messages
                        Hive.NetworkUtils
-                       Hive.Problem.TSP.Permutation
-                       Hive.Problem.TSP.Warrior
                        Hive.Problem.SSSP.Warrior
-                       Hive.Problem.ANTSP.Warrior
-                       Hive.Problem.ANTSP.Pheromones
+                       Hive.Problem.TSP.Warrior
+                       Hive.Problem.TSP.Pheromones
                        Hive.Problem.Data.Graph
                        Hive.Problem.Data.External.PosList
   hs-source-dirs:      src

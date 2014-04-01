@@ -1,6 +1,6 @@
 {-# LANGUAGE TemplateHaskell, DeriveGeneric, DeriveDataTypeable, RecordWildCards #-}
 
-module Hive.Problem.ANTSP.Warrior
+module Hive.Problem.TSP.Warrior
   ( run
   , __remoteTable
   ) where
@@ -25,7 +25,7 @@ import Hive.Types            (Queen, Warrior, Scheduler, Client, Task (..), Solu
 import Hive.Messages         (SSolutionC (..), WTaskS (..), StrMsg (..))
 
 import Hive.Problem.Data.Graph (Graph, Path, Node, size, pathLength', nodes, distance')
-import Hive.Problem.ANTSP.Pheromones (Pheromones, mkPheromones, evaporation, depositPheromones)
+import Hive.Problem.TSP.Pheromones (Pheromones, mkPheromones, evaporation, depositPheromones)
 
 -------------------------------------------------------------------------------
 

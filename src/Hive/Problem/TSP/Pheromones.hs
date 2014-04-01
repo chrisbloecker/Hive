@@ -1,4 +1,4 @@
-module Hive.Problem.ANTSP.Pheromones
+module Hive.Problem.TSP.Pheromones
   ( Pheromones
   , mkPheromones
   , toPheromones
