@@ -2,7 +2,7 @@
 --  see http://haskell.org/cabal/users-guide/
 
 name:                Hive
-version:             0.1.1.0
+version:             0.1.1.1
 -- synopsis:            
 -- description:         
 license:             GPL-3
@@ -16,7 +16,7 @@ build-type:          Simple
 cabal-version:       >=1.10
 
 library
-  -- ghc-options:
+  -- ghc-options:         -O2
   build-depends:       base == 4.*,
                        mtl,
                        text,
@@ -34,7 +34,6 @@ library
                        distributed-process >= 0.4 && < 0.5,
                        network-transport,
                        network-transport-tcp,
-                       --distributed-process-simplelocalnet >= 0.2 && < 0.3,
                        binary >= 0.5 && < 0.6,
                        derive >= 2.5 && < 2.6
   -- Compatibility with previous GHC versions.
@@ -57,7 +56,6 @@ library
                        Hive.Problem.ANTSP.Warrior
                        Hive.Problem.ANTSP.Pheromones
                        Hive.Problem.Data.Graph
---                       Hive.Problem.Data.Internal.Graph
---                       Hive.Problem.Data.External.Graph
+                       Hive.Problem.Data.External.PosList
   hs-source-dirs:      src
   default-language:    Haskell2010

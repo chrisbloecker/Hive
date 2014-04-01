@@ -22,7 +22,7 @@ import GHC.Generics      (Generic)
 import System.Random     (randomRIO)
 
 import Hive.Types            (Queen, Warrior, Scheduler, Client, Task (..), Solution (..))
-import Hive.Messages         (SSolutionC (..), WTaskS (..))
+import Hive.Messages         (SSolutionC (..), WTaskS (..), StrMsg (..))
 
 import Hive.Problem.Data.Graph (Graph, Path, Node, size, pathLength', nodes, distance')
 import Hive.Problem.ANTSP.Pheromones (Pheromones, mkPheromones, evaporation, depositPheromones)
@@ -46,21 +46,29 @@ $(derive makeBinary ''Candidates)
 
 -------------------------------------------------------------------------------
 
-ant :: (Warrior, Graph Int, Pheromones, Ants) -> Process ()
-ant (warrior, graph, pheromones, ants) = do
-  candidates <- liftIO $ mapM (const (runAnt graph pheromones [1] (nodes graph \\ [1]))) [1..ants]
-  send warrior $ Candidates $ map (id &&& pathLength' graph) candidates
+ant :: (Warrior, Queen, Graph Int, Pheromones, Ants) -> Process ()
+ant (warrior, queen, graph, pheromones, ants) = do
+  send queen $ StrMsg "Ant starting..."
+  candidates <- mapM (const (runAnt graph pheromones [1] (nodes graph \\ [1]))) [1..ants]
+  send warrior $ Candidates $ map ((id &&& pathLength' graph) . (++ [1])) candidates
     where
-      runAnt :: Graph Int -> Pheromones -> [Node] -> [Node] -> IO Path
+      runAnt :: Graph Int -> Pheromones -> [Node] -> [Node] -> Process Path
       runAnt _ _ visited        [] = return visited
       runAnt g p visited unvisited = do
+        --send queen $ StrMsg $ "visited:   " ++ show visited
+        --send queen $ StrMsg $ "unvisited: " ++ show unvisited
         let alpha    = 3
-            beta     = 5
-            tau      = distance' p (last visited)
-            eta      = fromIntegral . distance' g (last visited)
-            probs    = [tau u**alpha * eta u**beta | u <- unvisited]
-        rand <- randomRIO (0, sum probs)
-        let next  = fst . last . takeWhile ((< rand) . snd) $ zip unvisited (scanl1 (+) probs)
+        let beta     = 5
+        let tau      = distance' p (last visited)
+        --send queen $ StrMsg $ "tau: " ++ show tau
+        let eta      = (1.0/) . fromIntegral . distance' g (last visited)
+        --send queen $ StrMsg $ "eta: " ++ show eta
+        let probs    = [tau u**alpha * eta u**beta | u <- unvisited]
+        --send queen $ StrMsg $ "probs: " ++ show probs
+        rand <- liftIO $ randomRIO (0, sum probs)
+        --send queen $ StrMsg $ "rand: " ++ show rand
+        let next  = fst . head . dropWhile ((< rand) . snd) $ zip unvisited (scanl1 (+) probs)
+        --osend queen $ StrMsg $ "next: " ++ show next
         runAnt g p (visited ++ [next]) (unvisited \\ [next])
 
 
@@ -77,7 +85,7 @@ run queen scheduler client g iterations = do
       loop state@(WarriorS {..}) =
         if iteration < iterations then do
           self <- getSelfPid
-          let task = Task ($(mkClosure 'ant) (self :: Warrior, graph, pheromones, size graph))
+          let task = Task ($(mkClosure 'ant) (self :: Warrior, queen, graph, pheromones, size graph))
           forM_ [1 .. (size graph)] $ \_ -> send scheduler $ WTaskS self task
           candidateMessages <- mapM (\_ -> do { Candidates trips <- expect; return trips }) [1 .. (size graph)]
           let candidates = concat candidateMessages

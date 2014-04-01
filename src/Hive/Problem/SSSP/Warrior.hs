@@ -13,7 +13,6 @@ import Control.Arrow     ((&&&), second)
 
 import Data.List         (unfoldr)
 import Data.Text.Lazy    (pack)
-import Data.Maybe        (isJust)
 import Data.IntMap       (IntMap)
 import Data.Binary       (Binary, put, get)
 import Data.Typeable     (Typeable)
@@ -23,10 +22,10 @@ import GHC.Generics      (Generic)
 import Hive.Types            (Queen, Warrior, Scheduler, Client, Task (..), Solution (..))
 import Hive.Messages         (WGiveMeDronesS (..), SYourDronesW (..), SWorkReplyD (..), SSolutionC (..))
 
-import Hive.Problem.Data.Graph (Graph, Node, size, partitions, neighbours, distance, (<+>))
+import Hive.Problem.Data.Graph (Graph, Node, size, partitions, neighbours, distance')
 
-import qualified Data.IntMap as Map  ( empty, unionsWith, differenceWith, keys, fromListWith
-                                     , mapMaybe, partitionWithKey, singleton, unions, union, (\\), lookup)
+import qualified Data.IntMap as Map  ( (!), (\\), empty, unionsWith, differenceWith, keys, fromListWith
+                                     , partitionWithKey, singleton, unions, union)
 
 -------------------------------------------------------------------------------
 
@@ -101,10 +100,8 @@ worker warriorPid = do
 
       sendUpdates :: [Worker] -> [Node] -> Int -> PathLengths -> Graph Int -> Process ()
       sendUpdates ws ns indicator ps g = do
-        let d = Map.mapMaybe id
-              . Map.fromListWith min
-              . filter (isJust . snd)
-              . concatMap (\(from, tos) -> map (id &&& \to -> Map.lookup from ps <+> distance g from to) tos)
+        let d = Map.fromListWith min
+              . concatMap (\(from, tos) -> map (id &&& \to -> ps Map.! from + distance' g from to) tos)
               . map (id &&& neighbours g)
               $! ns
         forM_ (zip ws $! unfoldGraph d (length ws) indicator) $ \(w, part) ->
