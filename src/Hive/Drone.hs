@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE OverloadedStrings, RecordWildCards #-}
 
 module Hive.Drone
   ( runDrone
@@ -7,6 +7,7 @@ module Hive.Drone
 -------------------------------------------------------------------------------
 
 import System.Process (readProcess)
+import Control.Monad  (join)
 import Control.Distributed.Process ( Process, getSelfPid, link, send, expect,receiveWait, match
                                    , matchUnknown, unClosure, liftIO, say)
 
@@ -23,13 +24,15 @@ import Hive.Messages               ( QRegisteredD (..)
                                    , SWorkReplyD (..)
                                    , DWorkRequestS (..)
                                    , DAvailableS (..)
-                                   , StrMsg (..)
                                    )
 import Hive.NetworkUtils (whereisRemote)
 
 -------------------------------------------------------------------------------
 
-data DroneState = DroneState Queen Scheduler Logger
+data DroneState = DroneState { queen     :: Queen
+                             , scheduler :: Scheduler
+                             , logger    :: Logger
+                             }
   deriving (Show)
 
 -------------------------------------------------------------------------------
@@ -48,16 +51,11 @@ runDrone queenHost queenPort = do
     Nothing -> liftIO . putStrLn $ "No Queen found... Terminating..."
   where
     loop :: DroneState -> Process ()
-    loop state@(DroneState queen scheduler _logger) = do
-      send queen $ StrMsg "Entering drone loop..."
+    loop state@(DroneState {..}) = do
       dronePid <- getSelfPid
       send scheduler $ DWorkRequestS dronePid
       receiveWait [ match $ \(SWorkReplyD (Task closure)) -> do
-                      send queen $ StrMsg "A drone got work..."
-                      proc <- unClosure closure
-                      send queen $ StrMsg "Closure unpacked..."
-                      proc
-                      send queen $ StrMsg "Closure executed..."
+                      join (unClosure closure)
                       send scheduler $ DAvailableS dronePid
                       loop state
                   

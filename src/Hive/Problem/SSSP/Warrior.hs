@@ -86,6 +86,7 @@ worker warriorPid = do
                         workerLoop $ state { paths = paths' }
 
                     , match $ \Terminate -> do
+                        discardUpdates others
                         send warrior $ Part paths
                         return ()
                     ]
@@ -97,6 +98,9 @@ worker warriorPid = do
         let pls'    = Map.unionsWith min [pls, updates]
         let nodes   = Map.differenceWith (\old new -> if old > new then Just new else Nothing) pls pls' `Map.union` (updates Map.\\ pls)
         return (pls', Map.keys nodes)
+
+      discardUpdates :: [Worker] -> Process ()
+      discardUpdates = mapM_ (\_ -> do {Update _ <- expect; return ()})
 
       sendUpdates :: [Worker] -> [Node] -> Int -> PathLengths -> Graph Int -> Process ()
       sendUpdates ws ns indicator ps g = do

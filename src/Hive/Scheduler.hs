@@ -18,6 +18,7 @@ import Hive.Types                   (Queen, Drone, Logger, Task, ClientRequest (
 import Hive.Messages                ( QEnqueProblemS (..), DWorkRequestS (..), SWorkReplyD (..)
                                     , WTaskS (..), QNewDroneS (..), QDroneDisappearedS (..)
                                     , WGiveMeDronesS (..), SYourDronesW (..), DAvailableS (..)
+                                    , StrMsg (..)
                                     )
 
 -------------------------------------------------------------------------------
