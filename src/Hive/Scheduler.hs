@@ -7,7 +7,7 @@ module Hive.Scheduler
 -------------------------------------------------------------------------------
 
 import Control.Distributed.Process  ( Process, link, receiveWait, match, matchIf
-                                    , say, send, getSelfPid, spawnLocal)
+                                    , send, getSelfPid, spawnLocal)
 
 import Data.List                    (delete)
 import Data.Map                     (Map)
@@ -18,7 +18,6 @@ import Hive.Types                   (Queen, Drone, Logger, Task, ClientRequest (
 import Hive.Messages                ( QEnqueProblemS (..), DWorkRequestS (..), SWorkReplyD (..)
                                     , WTaskS (..), QNewDroneS (..), QDroneDisappearedS (..)
                                     , WGiveMeDronesS (..), SYourDronesW (..), DAvailableS (..)
-                                    , StrMsg (..)
                                     )
 
 -------------------------------------------------------------------------------
@@ -70,8 +69,7 @@ runScheduler queenPid loggerPid = do
   loop $ SchedulerS queenPid [] [] M.empty loggerPid []
     where
       loop :: SchedulerS -> Process ()
-      loop state@(SchedulerS{..}) = do
-        say $ "Currently there are " ++ (show . length $ queue) ++ " tasks in queue."
+      loop state@(SchedulerS{..}) =
         receiveWait [ match $ \(QEnqueProblemS (ClientRequest client problem)) -> do
                         self <- getSelfPid
                         _commanderPid <- spawnLocal $ startCommander queen self client problem

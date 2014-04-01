@@ -1,5 +1,6 @@
 module Hive.Problem.TSP.Pheromones
-  ( Pheromones
+  ( Pheromone
+  , Pheromones
   , mkPheromones
   , toPheromones
   , evaporation
@@ -12,14 +13,15 @@ import Hive.Problem.Data.Graph (Graph, Path, mkEmptyGraph, size, addEdge, distan
 
 -------------------------------------------------------------------------------
 
-type Pheromones = Graph Double
+type Pheromone  = Double
+type Pheromones = Graph Pheromone
 
 -------------------------------------------------------------------------------
 
-mkPheromones :: Num a => Graph a -> Pheromones
-mkPheromones gr =
+mkPheromones :: Num a => Graph a -> Pheromone -> Pheromones
+mkPheromones gr p0 =
   let ns = [1 .. (size gr)]
-  in  foldr' (\from g' -> foldr' (\to g'' -> addEdge g'' (from, to, 1.0)) g' ns) (mkEmptyGraph :: Graph Double) ns
+  in  foldr' (\from g' -> foldr' (\to g'' -> addEdge g'' (from, to, p0)) g' ns) (mkEmptyGraph :: Graph Double) ns
 
 toPheromones :: Path -> Int -> Pheromones
 toPheromones rt v = foldr (\(f, t) p -> addEdge p (f, t, 1.0 / fromIntegral v)) mkEmptyGraph (zip rt (tail rt))

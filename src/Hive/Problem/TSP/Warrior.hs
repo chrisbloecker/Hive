@@ -22,7 +22,7 @@ import GHC.Generics      (Generic)
 import System.Random     (randomRIO)
 
 import Hive.Types            (Queen, Warrior, Scheduler, Client, Task (..), Solution (..))
-import Hive.Messages         (SSolutionC (..), WTaskS (..), StrMsg (..))
+import Hive.Messages         (SSolutionC (..), WTaskS (..))
 
 import Hive.Problem.Data.Graph (Graph, Path, Node, size, pathLength', nodes, distance')
 import Hive.Problem.TSP.Pheromones (Pheromones, mkPheromones, evaporation, depositPheromones)
@@ -32,7 +32,7 @@ import Hive.Problem.TSP.Pheromones (Pheromones, mkPheromones, evaporation, depos
 type Iteration   = Int
 type Ants        = Int
 
-newtype Candidates = Candidates [(Path, Int)]     deriving (Generic, Typeable, Show)
+data Candidate = Candidate (Path, Int)          deriving (Generic, Typeable, Show)
 
 data WarriorS = WarriorS { graph      :: Graph Int
                          , pheromones :: Pheromones
@@ -42,33 +42,25 @@ data WarriorS = WarriorS { graph      :: Graph Int
 
 -------------------------------------------------------------------------------
 
-$(derive makeBinary ''Candidates)
+$(derive makeBinary ''Candidate)
 
 -------------------------------------------------------------------------------
 
-ant :: (Warrior, Queen, Graph Int, Pheromones, Ants) -> Process ()
-ant (warrior, queen, graph, pheromones, ants) = do
-  send queen $ StrMsg "Ant starting..."
-  candidates <- mapM (const (runAnt graph pheromones [1] (nodes graph \\ [1]))) [1..ants]
-  send warrior $ Candidates $ map ((id &&& pathLength' graph) . (++ [1])) candidates
+ant :: (Warrior, Graph Int, Pheromones) -> Process ()
+ant (warrior, graph, pheromones) = do
+  candidate <- runAnt graph pheromones [1] (nodes graph \\ [1])
+  send warrior $ Candidate $ (id &&& pathLength' graph) (candidate ++ [1])
     where
       runAnt :: Graph Int -> Pheromones -> [Node] -> [Node] -> Process Path
       runAnt _ _ visited        [] = return visited
       runAnt g p visited unvisited = do
-        --send queen $ StrMsg $ "visited:   " ++ show visited
-        --send queen $ StrMsg $ "unvisited: " ++ show unvisited
         let alpha    = 3
         let beta     = 5
         let tau      = distance' p (last visited)
-        --send queen $ StrMsg $ "tau: " ++ show tau
         let eta      = (1.0/) . fromIntegral . distance' g (last visited)
-        --send queen $ StrMsg $ "eta: " ++ show eta
         let probs    = [tau u**alpha * eta u**beta | u <- unvisited]
-        --send queen $ StrMsg $ "probs: " ++ show probs
         rand <- liftIO $ randomRIO (0, sum probs)
-        --send queen $ StrMsg $ "rand: " ++ show rand
         let next  = fst . head . dropWhile ((< rand) . snd) $ zip unvisited (scanl1 (+) probs)
-        --osend queen $ StrMsg $ "next: " ++ show next
         runAnt g p (visited ++ [next]) (unvisited \\ [next])
 
 
@@ -79,16 +71,15 @@ remotable ['ant]
 run :: Queen -> Scheduler -> Client -> Graph Int -> Iteration -> Process ()
 run queen scheduler client g iterations = do
   let initialSolution = nodes g
-  loop $ WarriorS g (mkPheromones g) (initialSolution, pathLength' g initialSolution) 0
+  loop $ WarriorS g (mkPheromones g 1.0) (initialSolution, pathLength' g initialSolution) 0
     where
       loop :: WarriorS -> Process ()
       loop state@(WarriorS {..}) =
         if iteration < iterations then do
           self <- getSelfPid
-          let task = Task ($(mkClosure 'ant) (self :: Warrior, queen, graph, pheromones, size graph))
+          let task = Task ($(mkClosure 'ant) (self :: Warrior, graph, pheromones))
           forM_ [1 .. (size graph)] $ \_ -> send scheduler $ WTaskS self task
-          candidateMessages <- mapM (\_ -> do { Candidates trips <- expect; return trips }) [1 .. (size graph)]
-          let candidates = concat candidateMessages
+          candidates <- mapM (\_ -> do { Candidate trip <- expect; return trip }) [1 .. (size graph)]
           loop state { pheromones = depositPheromones candidates . evaporation 0.1 $ pheromones
                      , solution   = minimumBy (compare `on` snd) (solution : candidates)
                      , iteration  = iteration + 1 }
