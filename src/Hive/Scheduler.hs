@@ -16,9 +16,9 @@ import qualified Data.Map as M      (empty, insert, lookup, delete)
 import Hive.Commander
 import Hive.Types                   (Queen, Drone, Logger, Task, ClientRequest (..))
 import Hive.Messages                ( QEnqueProblemS (..), DWorkRequestS (..), SWorkReplyD (..)
-                                    , WTaskS (..), SSendSolutionW (..), QNewDroneS (..)
-                                    , QDroneDisappearedS (..), WGiveMeDronesS (..), SYourDronesW (..)
-                                    , DAvailableS (..))
+                                    , WTaskS (..), QNewDroneS (..), QDroneDisappearedS (..)
+                                    , WGiveMeDronesS (..), SYourDronesW (..), DAvailableS (..)
+                                    )
 
 -------------------------------------------------------------------------------
 
@@ -73,8 +73,7 @@ runScheduler queenPid loggerPid = do
         say $ "Currently there are " ++ (show . length $ queue) ++ " tasks in queue."
         receiveWait [ match $ \(QEnqueProblemS (ClientRequest client problem)) -> do
                         self <- getSelfPid
-                        commanderPid <- spawnLocal $ startCommander queen self client problem
-                        send commanderPid SSendSolutionW
+                        _commanderPid <- spawnLocal $ startCommander queen self client problem
                         loop state
 
                     -- when a new drone registers, the queen tells the scheduler

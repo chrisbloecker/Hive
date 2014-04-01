@@ -21,7 +21,6 @@ module Hive.Messages
   , SSolutionC (..)
   , SWorkReplyD (..)
   , SYourDronesW (..)
-  , SSendSolutionW (..)
 
 -- messages from warrior
   , WTaskS (..)
@@ -58,7 +57,6 @@ data TxtMsg             = TxtMsg Text                            deriving (Gener
 -- messages from drones
 data DRegisterAtQ       = DRegisterAtQ Drone String              deriving (Generic, Typeable, Show)
 data DWorkRequestS      = DWorkRequestS Drone                    deriving (Generic, Typeable, Show)
---data DWorkDoneS         = DWorkDoneS Solution Client             deriving (Generic, Typeable, Show)
 data DAvailableS        = DAvailableS Drone                      deriving (Generic, Typeable, Show)
 
 -- messages from clients
@@ -69,7 +67,6 @@ data CGetStatisticsQ    = CGetStatisticsQ Client                 deriving (Gener
 data SSolutionC         = SSolutionC Solution                    deriving (Generic, Typeable, Show)
 data SWorkReplyD        = SWorkReplyD Task                       deriving (Generic, Typeable, Show)
 data SYourDronesW       = SYourDronesW [Drone]                   deriving (Generic, Typeable, Show)
-data SSendSolutionW     = SSendSolutionW                         deriving (Generic, Typeable, Show)
 
 -- messages from warrior
 data WTaskS             = WTaskS Warrior Task                    deriving (Generic, Typeable, Show)
@@ -100,7 +97,6 @@ $(derive makeBinary ''CGetStatisticsQ)
 $(derive makeBinary ''SSolutionC)
 $(derive makeBinary ''SWorkReplyD)
 $(derive makeBinary ''SYourDronesW)
-$(derive makeBinary ''SSendSolutionW)
 
 $(derive makeBinary ''WTaskS)
 $(derive makeBinary ''WGiveMeDronesS)
