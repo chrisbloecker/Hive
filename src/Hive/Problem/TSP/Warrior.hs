@@ -12,7 +12,6 @@ import Control.Monad     (forM_)
 import Control.Arrow     ((&&&))
 
 import Data.Function     (on)
-import Data.Foldable     (foldr')
 import Data.List         ((\\), minimumBy)
 import Data.Text.Lazy    (pack)
 import Data.Binary       (Binary, put, get)
@@ -25,7 +24,7 @@ import System.Random     (randomRIO)
 import Hive.Types            (Queen, Warrior, Scheduler, Client, Task (..), Solution (..))
 import Hive.Messages         (SSolutionC (..), WTaskS (..))
 
-import Hive.Problem.Data.Graph (Graph, Path, Node, size, pathLength', nodes, distance', overlay)
+import Hive.Problem.Data.Graph (Graph, Path, Node, size, pathLength', nodes, distance')
 import Hive.Problem.TSP.Pheromones (Pheromones, mkPheromones, evaporation, depositPheromones)
 
 -------------------------------------------------------------------------------
@@ -33,7 +32,7 @@ import Hive.Problem.TSP.Pheromones (Pheromones, mkPheromones, evaporation, depos
 type Iteration   = Int
 type Ants        = Int
 
-data Candidates = Candidates [(Path, Int)] Pheromones     deriving (Generic, Typeable, Show)
+data Candidate = Candidate (Path, Int)          deriving (Generic, Typeable, Show)
 
 data WarriorS = WarriorS { graph      :: Graph Int
                          , pheromones :: Pheromones
@@ -43,15 +42,14 @@ data WarriorS = WarriorS { graph      :: Graph Int
 
 -------------------------------------------------------------------------------
 
-$(derive makeBinary ''Candidates)
+$(derive makeBinary ''Candidate)
 
 -------------------------------------------------------------------------------
 
-ant :: (Warrior, Graph Int, Pheromones, Ants) -> Process ()
-ant (warrior, graph, pheromones, ants) = do
-  candidates <- mapM (const (runAnt graph pheromones [1] (nodes graph \\ [1]))) [1..ants]
-  let candidates' = map ((id &&& pathLength' graph) . (++ [1])) $! candidates
-  send warrior $ Candidates candidates' (depositPheromones candidates' (mkPheromones graph 0.0))
+ant :: (Warrior, Graph Int, Pheromones) -> Process ()
+ant (warrior, graph, pheromones) = do
+  candidate <- runAnt graph pheromones [1] (nodes graph \\ [1])
+  send warrior $ Candidate $ (id &&& pathLength' graph) (candidate ++ [1])
     where
       runAnt :: Graph Int -> Pheromones -> [Node] -> [Node] -> Process Path
       runAnt _ _ visited        [] = return visited
@@ -79,13 +77,11 @@ run queen scheduler client g iterations = do
       loop state@(WarriorS {..}) =
         if iteration < iterations then do
           self <- getSelfPid
-          let task = Task ($(mkClosure 'ant) (self :: Warrior, graph, pheromones, size graph))
+          let task = Task ($(mkClosure 'ant) (self :: Warrior, graph, pheromones))
           forM_ [1 .. (size graph)] $ \_ -> send scheduler $ WTaskS self task
-          candidates <- mapM (\_ -> do { Candidates trips pheromones' <- expect; return (trips, pheromones') }) [1 .. (size graph)]
-          let trips       = concat . fst . unzip $ candidates
-          let pheromones' = snd . unzip $ candidates
-          loop state { pheromones = foldr' (overlay (+)) (evaporation 0.1 pheromones) pheromones'
-                     , solution   = minimumBy (compare `on` snd) (solution : trips)
+          candidates <- mapM (\_ -> do { Candidate trip <- expect; return trip }) [1 .. (size graph)]
+          loop state { pheromones = depositPheromones candidates . evaporation 0.1 $ pheromones
+                     , solution   = minimumBy (compare `on` snd) (solution : candidates)
                      , iteration  = iteration + 1 }
         else
             send client $ SSolutionC $ Solution (pack . show . fst $ solution) (snd solution)
