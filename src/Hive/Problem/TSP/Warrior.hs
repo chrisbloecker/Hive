@@ -34,10 +34,10 @@ type Ants        = Int
 
 data Candidate = Candidate (Path, Int)          deriving (Generic, Typeable, Show)
 
-data WarriorS = WarriorS { graph      :: Graph Int
-                         , pheromones :: Pheromones
-                         , solution   :: (Path, Int)
-                         , iteration  :: Iteration
+data WarriorS = WarriorS { graph      :: !(Graph Int)
+                         , pheromones :: !Pheromones
+                         , solution   :: !(Path, Int)
+                         , iteration  :: !Iteration
                          } deriving (Eq, Show)
 
 -------------------------------------------------------------------------------

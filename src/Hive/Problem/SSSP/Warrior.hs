@@ -25,7 +25,7 @@ import Hive.Messages         (WGiveMeDronesS (..), SYourDronesW (..), SWorkReply
 import Hive.Problem.Data.Graph (Graph, Node, size, partitions, neighbours, distance')
 
 import qualified Data.IntMap as Map  ( (!), (\\), empty, unionsWith, differenceWith, keys, fromListWith
-                                     , partitionWithKey, singleton, unions, union)
+                                     , partitionWithKey, singleton, unions, union, toList)
 
 -------------------------------------------------------------------------------
 
@@ -40,14 +40,14 @@ data Tock        = Tock Updates                    deriving (Generic, Typeable, 
 data Update      = Update PathLengths              deriving (Generic, Typeable, Show)
 data Part        = Part PathLengths                deriving (Generic, Typeable, Show)
 
-data WorkerS a = WorkerS { warrior   :: Warrior
-                         , others    :: [Worker]
-                         , indicator :: Int
+data WorkerS a = WorkerS { warrior   :: !Warrior
+                         , others    :: ![Worker]
+                         , indicator :: !Int
                          , vertices  :: !(Graph a)
                          , paths     :: !PathLengths
                          } deriving (Eq, Show)
 
-data WarriorS  = WarriorS { workers :: [Worker]
+data WarriorS  = WarriorS { workers :: ![Worker]
                           } deriving (Eq, Show)
 
 -------------------------------------------------------------------------------
@@ -135,7 +135,7 @@ run queen scheduler client graph = do
         else do
           sendAll workers Terminate
           parts <- mapM (\_ -> do {Part part <- expect; return part}) workers
-          send client $ SSolutionC $ Solution (pack . show $ Map.unions parts) 0
+          send client $ SSolutionC $ Solution (pack . show . Map.toList $ Map.unions parts) 0
 
       initWorkers :: [Worker] -> Graph Int -> Process ()
       initWorkers ws g = do
