@@ -40,6 +40,19 @@ data QueenState = QueenState { scheduler :: Scheduler
 
 -------------------------------------------------------------------------------
 
+addDrone :: (Drone, CPUInfo) -> QueenState -> QueenState
+addDrone (d, cpuInfo) s@(QueenState {..}) = s { drones = d `Set.insert` drones, cpuInfos = Map.insert d cpuInfo cpuInfos }
+
+removeDrone :: Drone -> QueenState -> QueenState
+removeDrone d s@(QueenState {..}) = s { drones = d `Set.delete` drones, cpuInfos = d `Map.delete` cpuInfos }
+
+-------------------------------------------------------------------------------
+
+connectDrone :: Drone -> Scheduler -> Logger -> Process ()
+connectDrone drone scheduler logger = send drone (QRegisteredD scheduler logger) >> send scheduler (QNewDroneS drone)
+
+-------------------------------------------------------------------------------
+
 runQueen ::Process ()
 runQueen = do
   queen     <- getSelfPid
@@ -60,9 +73,8 @@ runQueen = do
                     , match $ \(DRegisterAtQ drone cpuInfo) -> do
                         say $ "Drone registered at " ++ show drone
                         _mon <- monitor drone
-                        send drone $ QRegisteredD scheduler logger
-                        send scheduler $ QNewDroneS drone
-                        loop $ QueenState scheduler logger (drone `Set.insert` drones) (Map.insert drone cpuInfo cpuInfos)
+                        connectDrone drone scheduler logger
+                        loop . addDrone (drone, cpuInfo) $ state
 
                     , match $ \(CSolveProblemQ problem) -> do
                         say "Solve request received..."
@@ -70,13 +82,14 @@ runQueen = do
                         loop state
 
                     , match $ \(CGetStatisticsQ client) -> do
+                        say "Statistics request received..."
                         send client $ QStatisticsC . Statistics $ Map.elems cpuInfos
                         loop state
 
                     , match $ \(ProcessMonitorNotification _mon drone _reason) -> do
                         say $ show drone ++ " died..."
                         send scheduler $ QDroneDisappearedS drone
-                        loop $ state { drones = drone `Set.delete` drones, cpuInfos = drone `Map.delete` cpuInfos }
+                        loop . removeDrone drone $ state
 
                     , matchUnknown $ do 
                         say "Unknown message received. Discarding..."

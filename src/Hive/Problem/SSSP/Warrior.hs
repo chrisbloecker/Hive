@@ -19,7 +19,7 @@ import Data.Typeable     (Typeable)
 import Data.DeriveTH     (derive, makeBinary)
 import GHC.Generics      (Generic)
 
-import Hive.Types            (Queen, Warrior, Scheduler, Client, Task (..), Solution (..))
+import Hive.Types            (Warrior, Scheduler, Client, Task (..), Solution (..))
 import Hive.Messages         (WGiveMeDronesS (..), SYourDronesW (..), SWorkReplyD (..), SSolutionC (..))
 
 import Hive.Problem.Data.Graph (Graph, Node, size, partitions, neighbours, distance')
@@ -116,8 +116,8 @@ remotable ['worker, 'unfoldGraph]
 
 -------------------------------------------------------------------------------
 
-run :: Queen -> Scheduler -> Client -> Graph Int -> Process ()
-run queen scheduler client graph = do
+run :: Scheduler -> Client -> Graph Int -> Process ()
+run scheduler client graph = do
   self <- getSelfPid
   send scheduler $ WGiveMeDronesS self (round . (log :: Double -> Double) . fromIntegral $ size graph)
   (SYourDronesW drones) <- expect

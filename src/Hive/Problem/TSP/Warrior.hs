@@ -21,7 +21,7 @@ import GHC.Generics      (Generic)
 
 import System.Random     (randomRIO)
 
-import Hive.Types            (Queen, Warrior, Scheduler, Client, Task (..), Solution (..))
+import Hive.Types            (Warrior, Scheduler, Client, Task (..), Solution (..))
 import Hive.Messages         (SSolutionC (..), WTaskS (..))
 
 import Hive.Problem.Data.Graph (Graph, Path, Node, size, pathLength', nodes, distance')
@@ -68,8 +68,8 @@ remotable ['ant]
 
 -------------------------------------------------------------------------------
 
-run :: Queen -> Scheduler -> Client -> Graph Int -> Iteration -> Process ()
-run queen scheduler client g iterations = do
+run :: Scheduler -> Client -> Graph Int -> Iteration -> Process ()
+run scheduler client g iterations = do
   let initialSolution = nodes g
   loop $ WarriorS g (mkPheromones g 1.0) (initialSolution, pathLength' g initialSolution) 0
     where

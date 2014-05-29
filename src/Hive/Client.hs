@@ -5,16 +5,16 @@ module Hive.Client
 
 -------------------------------------------------------------------------------
 
-import Control.Concurrent.MVar (MVar, putMVar, tryPutMVar)
+import Control.Concurrent.MVar     (MVar, putMVar, tryPutMVar)
 import Control.Distributed.Process (Process, getSelfPid, liftIO, send, receiveTimeout, match)
 
-import Hive.Types (Problem, Statistics (..), Solution (..), ClientRequest (..), Timeout, unTimeout, milliseconds)
-import Hive.Messages (CSolveProblemQ (..), SSolutionC (..), QStatisticsC (..), CGetStatisticsQ (..))
+import Hive.Types        (Problem, Statistics (..), Solution (..), ClientRequest (..), Timeout, Host, Port, unTimeout, milliseconds)
+import Hive.Messages     (CSolveProblemQ (..), SSolutionC (..), QStatisticsC (..), CGetStatisticsQ (..))
 import Hive.NetworkUtils (whereisRemote)
 
 -------------------------------------------------------------------------------
 
-solveRequest :: String -> String -> Problem -> MVar Solution -> Timeout -> Process ()
+solveRequest :: Host -> Port -> Problem -> MVar Solution -> Timeout -> Process ()
 solveRequest queenHost queenPort problem mvar waitForResult = do
   self     <- getSelfPid
   queenPid <- whereisRemote queenHost queenPort "queen" (milliseconds 500)
@@ -30,7 +30,7 @@ solveRequest queenHost queenPort problem mvar waitForResult = do
       return ()
     Nothing -> error "No Queen found... Terminating..."
 
-getStatistics :: String -> String -> MVar Statistics -> Timeout -> Process ()
+getStatistics :: Host -> Port -> MVar Statistics -> Timeout -> Process ()
 getStatistics queenHost queenPort mvar waitForResult = do
   self     <- getSelfPid
   queenPid <- whereisRemote queenHost queenPort "queen" (milliseconds 500)

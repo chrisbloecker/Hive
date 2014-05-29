@@ -9,6 +9,8 @@ module Hive.Types
   , Logger
   , Timeout (unTimeout)
   , milliseconds, seconds, minutes, hours
+  , Host
+  , Port
   , CPUInfo
   , Task (..)
   , Statistics (..)
@@ -37,6 +39,9 @@ import Hive.Problem.Types      ( ProblemType (..)
 -------------------------------------------------------------------------------
 
 newtype Timeout = Timeout { unTimeout :: Int }  deriving (Eq, Show)
+
+type Host = String
+type Port = String
 
 type Queen     = ProcessId
 type Drone     = ProcessId
