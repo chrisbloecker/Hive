@@ -22,16 +22,15 @@ module Hive.Messages
   , SWorkReplyD (..)
   , SYourDronesW (..)
 
--- messages from warrior
-  , WTaskS (..)
-  , WGiveMeDronesS (..)
+-- messages from process creators
+-- no, we don't have any, check below
 
 -- messages from queen
   , QRegisteredD (..)
   , QNewDroneS (..)
   , QDroneDisappearedS (..)
   , QWorkD (..)
-  , QEnqueProblemS (..)
+  , QEnqueRequestS (..)
   , QStatisticsC (..)
   ) where
 
@@ -68,16 +67,15 @@ data SSolutionC         = SSolutionC Solution                    deriving (Gener
 data SWorkReplyD        = SWorkReplyD Task                       deriving (Generic, Typeable, Show)
 data SYourDronesW       = SYourDronesW [Drone]                   deriving (Generic, Typeable, Show)
 
--- messages from warrior
-data WTaskS             = WTaskS Warrior Task                    deriving (Generic, Typeable, Show)
-data WGiveMeDronesS     = WGiveMeDronesS Warrior Integer         deriving (Generic, Typeable, Show)
+-- messages from process creator
+-- none so far, process creators should create process chains
 
 -- messages from queen
 data QRegisteredD       = QRegisteredD Scheduler Logger          deriving (Generic, Typeable, Show)
 data QNewDroneS         = QNewDroneS Drone                       deriving (Generic, Typeable, Show)
 data QDroneDisappearedS = QDroneDisappearedS Drone               deriving (Generic, Typeable, Show)
 data QWorkD             = QWorkD Problem                         deriving (Generic, Typeable, Show)
-data QEnqueProblemS     = QEnqueProblemS ClientRequest           deriving (Generic, Typeable, Show)
+data QEnqueRequestS     = QEnqueRequestS ClientRequest           deriving (Generic, Typeable, Show)
 data QStatisticsC       = QStatisticsC Statistics                deriving (Generic, Typeable, Show)
 
 -------------------------------------------------------------------------------
@@ -98,12 +96,9 @@ $(derive makeBinary ''SSolutionC)
 $(derive makeBinary ''SWorkReplyD)
 $(derive makeBinary ''SYourDronesW)
 
-$(derive makeBinary ''WTaskS)
-$(derive makeBinary ''WGiveMeDronesS)
-
 $(derive makeBinary ''QRegisteredD)
 $(derive makeBinary ''QNewDroneS)
 $(derive makeBinary ''QDroneDisappearedS)
 $(derive makeBinary ''QWorkD)
-$(derive makeBinary ''QEnqueProblemS)
+$(derive makeBinary ''QEnqueRequestS)
 $(derive makeBinary ''QStatisticsC)

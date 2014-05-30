@@ -1,5 +1,3 @@
-{-# LANGUAGE RecordWildCards #-}
-
 module Hive.Scheduler
   ( runScheduler
   ) where
@@ -9,60 +7,13 @@ module Hive.Scheduler
 import Control.Distributed.Process  ( Process, link, receiveWait, match, matchIf
                                     , send, getSelfPid, spawnLocal)
 
-import Data.List                    (delete)
-import Data.Map                     (Map)
-import qualified Data.Map as M      (empty, insert, lookup, delete)
-
-import Hive.Commander
-import Hive.Types                   (Queen, Drone, Logger, Task, ClientRequest (..))
-import Hive.Messages                ( QEnqueProblemS (..), DWorkRequestS (..), SWorkReplyD (..)
+import Hive.Commander               (startCommander)
+import Hive.Types                   (Queen, Logger, ClientRequest (..))
+import Hive.Messages                ( QEnqueRequestS (..), DWorkRequestS (..), SWorkReplyD (..)
                                     , WTaskS (..), QNewDroneS (..), QDroneDisappearedS (..)
-                                    , WGiveMeDronesS (..), SYourDronesW (..), DAvailableS (..)
+                                    , DAvailableS (..)
                                     )
-
--------------------------------------------------------------------------------
-
-data SchedulerS = SchedulerS { queen           :: Queen
-                             , availableDrones :: ![Drone]
-                             , busyDrones      :: ![Drone]
-                             , taskAllocation  :: !(Map Drone Task)
-                             , logger          :: Logger
-                             , queue           :: ![Task]
-                             }
-  deriving (Show)
-
--------------------------------------------------------------------------------
-
-mkEmptyState :: Queen -> Logger -> SchedulerS
-mkEmptyState queen logger = SchedulerS queen [] [] M.empty logger []
-
-addAvailableDrone :: Drone -> SchedulerS -> SchedulerS
-addAvailableDrone d s@(SchedulerS {..}) = s { availableDrones = d : availableDrones }
-
-delAvailableDrone :: Drone -> SchedulerS -> SchedulerS
-delAvailableDrone d s@(SchedulerS {..}) = s { availableDrones = d `delete` availableDrones }
-
-addBusyDrone :: Drone -> SchedulerS -> SchedulerS
-addBusyDrone d s@(SchedulerS {..}) = s { busyDrones = d : busyDrones }
-
-delBusyDrone :: Drone -> SchedulerS -> SchedulerS
-delBusyDrone d s@(SchedulerS {..}) = s { busyDrones = d `delete` busyDrones }
-
-addTaskAllocation :: Drone -> Task -> SchedulerS -> SchedulerS
-addTaskAllocation d t s@(SchedulerS {..}) = s { taskAllocation = M.insert d t taskAllocation }
-
-delTaskAllocation :: Drone -> SchedulerS -> SchedulerS
-delTaskAllocation d s@(SchedulerS {..}) = s { taskAllocation = d `M.delete` taskAllocation }
-
-addTask :: Task -> SchedulerS -> SchedulerS
-addTask t s@(SchedulerS {..}) = s { queue = queue ++ [t] }
-
-resetTask :: Maybe Task -> SchedulerS -> SchedulerS
-resetTask (Just t) s = addTask t s
-resetTask Nothing  s = s
-
-tailQueue :: SchedulerS -> SchedulerS
-tailQueue s@(SchedulerS {..}) = s { queue = tail queue }
+import Hive.Scheduler.State
 
 -------------------------------------------------------------------------------
 
@@ -72,49 +23,43 @@ runScheduler queenPid loggerPid = do
   loop (mkEmptyState queenPid loggerPid)
     where
       loop :: SchedulerS -> Process ()
-      loop state@(SchedulerS{..}) =
-        receiveWait [ match $ \(QEnqueProblemS (ClientRequest client problem)) -> do
-                        self <- getSelfPid
-                        _commanderPid <- spawnLocal $ startCommander self client problem
-                        loop state
+      loop state = receiveWait [ -- 
+                                 match $ \(QEnqueRequestS (ClientRequest client problem)) -> do
+                                   self <- getSelfPid
+                                   _commanderPid <- spawnLocal $ startCommander self client problem
+                                   loop state
 
-                    -- when a new drone registers, the queen tells the scheduler
-                    , match $ \(QNewDroneS drone) ->
-                        loop . addAvailableDrone drone
-                             $ state
+                               -- when a new drone registers, the queen tells the scheduler
+                               , match $ \(QNewDroneS drone) ->
+                                   loop . addAvailableDrone drone
+                                        $ state
 
-                    -- when a drone disappears, the quenns tells the scheduler
-                    , match $ \(QDroneDisappearedS drone) -> do
-                        let task = M.lookup drone taskAllocation
-                        loop . delTaskAllocation drone
-                             . resetTask task
-                             . delBusyDrone drone
-                             . delAvailableDrone drone
-                             $ state
+                               -- when a drone disappears, the queen tells the scheduler
+                               , match $ \(QDroneDisappearedS drone) -> do
+                                   let task = findTaskAllocation drone state
+                                   loop . removeTaskAllocation drone
+                                        . resetTask task
+                                        . removeBusyDrone drone
+                                        . removeAvailableDrone drone
+                                        $ state
 
-                    , match $ \(WGiveMeDronesS warrior amount) -> do
-                        let drones = take (fromIntegral amount) availableDrones
-                        send warrior $ SYourDronesW drones
-                        loop . foldr ((.) . (\d -> addBusyDrone d . delAvailableDrone d)) id drones
-                             $ state
+                               -- request from a coordinator to add a new task
+                               , match $ \(WTaskS _warrior task) ->
+                                   loop . addTask task
+                                        $ state
 
-                    -- request from a coordinator to add a new task
-                    , match $ \(WTaskS _warrior task) ->
-                        loop . addTask task
-                             $ state
+                               , match $ \(DAvailableS drone) ->
+                                   loop . addAvailableDrone drone
+                                        . removeBusyDrone drone
+                                        $ state
 
-                    , match $ \(DAvailableS drone) ->
-                        loop . addAvailableDrone drone
-                             . delBusyDrone drone
-                             $ state
-
-                    -- if there are tasks, we can supply drones with work
-                    , matchIf (\_ -> not . null $ queue) $ \(DWorkRequestS drone) -> do
-                        let task = head queue
-                        send drone $ SWorkReplyD task
-                        loop . tailQueue
-                             . addTaskAllocation drone task
-                             . addBusyDrone drone
-                             . delAvailableDrone drone
-                             $ state
-                    ]
+                               -- if there are tasks, we can supply drones with work
+                               , matchIf (\_ -> not . isEmptyQueue $ state) $ \(DWorkRequestS drone) -> do
+                                   let task = nextTask state
+                                   send drone $ SWorkReplyD task
+                                   loop . tailQueue
+                                        . addTaskAllocation drone task
+                                        . addBusyDrone drone
+                                        . removeAvailableDrone drone
+                                        $ state
+                               ]

@@ -76,9 +76,9 @@ runQueen = do
                         connectDrone drone scheduler logger
                         loop . addDrone (drone, cpuInfo) $ state
 
-                    , match $ \(CSolveProblemQ problem) -> do
+                    , match $ \(CSolveProblemQ request@(ClientRequest client problem)) -> do
                         say "Solve request received..."
-                        send scheduler $ QEnqueProblemS problem
+                        send scheduler $ QEnqueRequestS request
                         loop state
 
                     , match $ \(CGetStatisticsQ client) -> do

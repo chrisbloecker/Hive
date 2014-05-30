@@ -22,7 +22,7 @@ import GHC.Generics      (Generic)
 import System.Random     (randomRIO)
 
 import Hive.Types            (Warrior, Scheduler, Client, Task (..), Solution (..))
-import Hive.Messages         (SSolutionC (..), WTaskS (..))
+import Hive.Messages         (SSolutionC (..), WTaskS ()
 
 import Hive.Problem.Data.Graph (Graph, Path, Node, size, pathLength', nodes, distance')
 import Hive.Problem.TSP.Pheromones (Pheromones, mkPheromones, evaporation, depositPheromones)

@@ -1,23 +1,14 @@
 module Hive.Commander
-  where
+  ( startCommander
+  ) where
 
 import Control.Distributed.Process (Process, link, send)
 
 import Hive.Types    (Scheduler, Client, Problem (Problem), Instance (Instance), ProblemType (..), Solution (..))
 import Hive.Messages (SSolutionC (..))
 
-import qualified Hive.Problem.TSP.Warrior  as TSPW
-import qualified Hive.Problem.SSSP.Warrior as SSSPW
-
-
 import qualified Hive.Problem.Data.Graph            as G (parse, size)
 import qualified Hive.Problem.Data.External.PosList as P (parse, convertToGraph)
-
--------------------------------------------------------------------------------
-
-data WarriorS = WarriorS { scheduler :: Scheduler
-                         , client    :: Client
-                         }
 
 -------------------------------------------------------------------------------
 
