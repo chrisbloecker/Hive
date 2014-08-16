@@ -17,14 +17,13 @@ import Control.Distributed.Process
   , matchUnknown
   , monitor
   , send
+  , link
   )
 
 import Data.Set as Set
-import Data.Map as Map
 
 import Hive.Types
 import Hive.Messages
-import Hive.Logger
 import Hive.Scheduler
 
 -------------------------------------------------------------------------------
@@ -32,24 +31,22 @@ import Hive.Scheduler
 type QueenSearchReply = Maybe Queen
 
 data QueenState = QueenState { scheduler :: Scheduler
-                             , logger    :: Logger
                              , drones    :: Set Drone
-                             , cpuInfos  :: Map Drone CPUInfo
                              }
   deriving (Show)
 
 -------------------------------------------------------------------------------
 
-addDrone :: (Drone, CPUInfo) -> QueenState -> QueenState
-addDrone (d, cpuInfo) s@(QueenState {..}) = s { drones = d `Set.insert` drones, cpuInfos = Map.insert d cpuInfo cpuInfos }
+addDrone :: Drone -> QueenState -> QueenState
+addDrone d s@(QueenState {..}) = s { drones = d `Set.insert` drones}
 
 removeDrone :: Drone -> QueenState -> QueenState
-removeDrone d s@(QueenState {..}) = s { drones = d `Set.delete` drones, cpuInfos = d `Map.delete` cpuInfos }
+removeDrone d s@(QueenState {..}) = s { drones = d `Set.delete` drones }
 
 -------------------------------------------------------------------------------
 
-connectDrone :: Drone -> Scheduler -> Logger -> Process ()
-connectDrone drone scheduler logger = send drone (QRegisteredD scheduler logger) >> send scheduler (QNewDroneS drone)
+connectDrone :: Drone -> Scheduler -> Process ()
+connectDrone drone scheduler = send drone (QRegisteredD scheduler) >> send scheduler (QNewDroneS drone)
 
 -------------------------------------------------------------------------------
 
@@ -57,12 +54,11 @@ runQueen ::Process ()
 runQueen = do
   queen     <- getSelfPid
   register "queen" queen
-  logger    <- spawnLocal $ runLogger    queen
-  scheduler <- spawnLocal $ runScheduler queen logger
+  scheduler <- spawnLocal $ runScheduler queen
+  link scheduler
   say $ "Queen     is at " ++ show queen
-  say $ "Logger    is at " ++ show logger
   say $ "Scheduler is at " ++ show scheduler
-  loop $ QueenState scheduler logger Set.empty Map.empty
+  loop $ QueenState scheduler Set.empty
     where
       loop :: QueenState -> Process ()
       loop state@(QueenState {..}) =
@@ -70,20 +66,15 @@ runQueen = do
                         say $ "Received StrMsg: " ++ s
                         loop state
 
-                    , match $ \(DRegisterAtQ drone cpuInfo) -> do
+                    , match $ \(DRegisterAtQ drone) -> do
                         say $ "Drone registered at " ++ show drone
                         _mon <- monitor drone
-                        connectDrone drone scheduler logger
-                        loop . addDrone (drone, cpuInfo) $ state
+                        connectDrone drone scheduler
+                        loop . addDrone drone $ state
 
-                    , match $ \(CSolveProblemQ request@(ClientRequest client problem)) -> do
+                    , match $ \(CSolveProblemQ request@(ClientRequest _ _)) -> do
                         say "Solve request received..."
                         send scheduler $ QEnqueRequestS request
-                        loop state
-
-                    , match $ \(CGetStatisticsQ client) -> do
-                        say "Statistics request received..."
-                        send client $ QStatisticsC . Statistics $ Map.elems cpuInfos
                         loop state
 
                     , match $ \(ProcessMonitorNotification _mon drone _reason) -> do

@@ -6,60 +6,77 @@ module Hive.Drone
 
 -------------------------------------------------------------------------------
 
-import System.Process (readProcess)
-import Control.Monad  (join)
-import Control.Distributed.Process ( Process, getSelfPid, link, send, expect,receiveWait, match
-                                   , matchUnknown, unClosure, liftIO, say)
+import Control.Monad  (join, forM_)
+import Control.Distributed.Process ( Process, ProcessId, ProcessMonitorNotification(..), spawnLocal, getSelfPid, link, monitor
+                                   , send, expect, receiveWait, match, matchUnknown, unClosure, liftIO, say, sendChan)
+
+import Control.Applicative ((<$>))
 
 -------------------------------------------------------------------------------
 
 import Hive.Types                  ( Queen
+                                   , Drone
                                    , Scheduler
-                                   , Logger
                                    , Task (..)
                                    , milliseconds
                                    )
 import Hive.Messages               ( QRegisteredD (..)
-                                   , DRegisterAtQ (..)
-                                   , SWorkReplyD (..)
                                    , DWorkRequestS (..)
-                                   , DAvailableS (..)
+                                   , DRegisterAtQ (..)
                                    )
 import Hive.NetworkUtils (whereisRemote)
 
 -------------------------------------------------------------------------------
 
-data DroneState = DroneState { queen     :: Queen
-                             , scheduler :: Scheduler
-                             , logger    :: Logger
+data DroneState = DroneState { queen      :: Queen
+                             , scheduler  :: Scheduler
+                             , workers    :: [ProcessId]
                              }
   deriving (Show)
 
 -------------------------------------------------------------------------------
 
-runDrone :: String -> String -> Process ()
-runDrone queenHost queenPort = do
+runDrone :: String -> String -> Int -> Process ()
+runDrone queenHost queenPort workerCount = do
   dronePid <- getSelfPid
-  queenPid <- whereisRemote queenHost queenPort "queen" (milliseconds 500)
+  queenPid <- whereisRemote queenHost queenPort "queen" (milliseconds 1000)
   case queenPid of
     Just queen -> do
-      cpuInfo <- liftIO $ readProcess "grep" ["model name", "/proc/cpuinfo"] ""
-      send queen $ DRegisterAtQ dronePid (tail . dropWhile (/= ':') . takeWhile (/= '\n') $ cpuInfo)
-      QRegisteredD scheduler logger <- expect
+      send queen $ DRegisterAtQ dronePid
+      QRegisteredD scheduler <- expect
       link queen
-      loop $ DroneState queen scheduler logger
+      forM_ [1 .. workerCount] $ \_ -> spawnLocal (worker dronePid) >>= monitor
+      loop $ DroneState queen scheduler []
     Nothing -> liftIO . putStrLn $ "No Queen found... Terminating..."
   where
     loop :: DroneState -> Process ()
     loop state@(DroneState {..}) = do
       dronePid <- getSelfPid
-      send scheduler $ DWorkRequestS dronePid
-      receiveWait [ match $ \(SWorkReplyD (Task closure)) -> do
-                      join (unClosure closure)
-                      send scheduler $ DAvailableS dronePid
+      receiveWait [ match $ \task@(Task _) -> do
+                      send (head workers) task
+                      loop $ state { workers = tail workers }
+
+                  , match $ \(ProcessMonitorNotification _mon _drone _reason) -> do
+                      spawnLocal (worker dronePid) >>= monitor
                       loop state
-                  
+
+                  , match $ \(DWorkRequestS workerPid) -> do
+                      send scheduler (DWorkRequestS dronePid)
+                      loop $ state { workers = workers ++ [workerPid] }
+
                   , matchUnknown $ do
                       say "Unknown message received. Discarding..."
                       loop state
                   ]
+
+worker :: Drone -> Process ()
+worker coord = do
+  link coord
+  loop coord
+    where
+      loop :: Drone -> Process ()
+      loop drone = do
+        send drone =<< DWorkRequestS <$> getSelfPid
+        Task closure <- expect
+        res <- unClosure closure
+        loop drone

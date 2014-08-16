@@ -2,8 +2,8 @@
 
 module Hive.Problem.Types
   ( ProblemType (..)
-  , Problem (..)
-  , Instance (..)
+  , Problem (Problem, problemType, inst)
+  , Instance (Instance, unInstance)
   , Solution (..)
   ) where
 
@@ -17,10 +17,10 @@ import GHC.Generics     (Generic)
 
 -------------------------------------------------------------------------------
 
-data ProblemType  = TSP   -- Traveling Salesman Problem
+data ProblemType  = ARITH -- Arithmetic Expression
+                  | TSP   -- Traveling Salesman Problem
                   | SSSP  -- Single Source Shortest Path
                   | APSP  -- All Pair Shortest Path
-
   deriving (Eq, Show, Enum, Bounded, Generic, Typeable)
 
 newtype Instance = Instance { unInstance :: Text }           deriving (Generic, Typeable, Show)

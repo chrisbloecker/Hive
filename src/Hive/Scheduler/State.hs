@@ -19,7 +19,7 @@ module Hive.Scheduler.State
 
 -------------------------------------------------------------------------------
 
-import Hive.Types (Queen, Drone, Logger, Task)
+import Hive.Types (Queen, Drone, Task)
 
 import Data.Map (Map)
 
@@ -32,15 +32,14 @@ data SchedulerS = SchedulerS { queen           :: Queen
                              , availableDrones :: ![Drone]
                              , busyDrones      :: ![Drone]
                              , taskAllocation  :: !(Map Drone Task)
-                             , logger          :: Logger
                              , queue           :: ![Task]
                              }
-  deriving (Show)
+  deriving ()
 
 -------------------------------------------------------------------------------
 
-mkEmptyState :: Queen -> Logger -> SchedulerS
-mkEmptyState queen logger = SchedulerS queen [] [] M.empty logger []
+mkEmptyState :: Queen -> SchedulerS
+mkEmptyState queen = SchedulerS queen [] [] M.empty []
 
 addAvailableDrone :: Drone -> SchedulerS -> SchedulerS
 addAvailableDrone d s@(SchedulerS {..}) = s { availableDrones = d : availableDrones }

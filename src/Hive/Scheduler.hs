@@ -5,28 +5,28 @@ module Hive.Scheduler
 -------------------------------------------------------------------------------
 
 import Control.Distributed.Process  ( Process, link, receiveWait, match, matchIf
-                                    , send, getSelfPid, spawnLocal)
+                                    , send, getSelfPid)
 
-import Hive.Commander               (startCommander)
-import Hive.Types                   (Queen, Logger, ClientRequest (..))
+import Hive.Types                   (Queen, ClientRequest (..))
 import Hive.Messages                ( QEnqueRequestS (..), DWorkRequestS (..), SWorkReplyD (..)
-                                    , WTaskS (..), QNewDroneS (..), QDroneDisappearedS (..)
-                                    , DAvailableS (..)
+                                    , QNewDroneS (..), QDroneDisappearedS (..), DAvailableS (..)
                                     )
 import Hive.Scheduler.State
+import Hive.Scheduler.Process
 
 -------------------------------------------------------------------------------
 
-runScheduler :: Queen -> Logger -> Process ()
-runScheduler queenPid loggerPid = do
+-------------------------------------------------------------------------------
+
+runScheduler :: Queen -> Process ()
+runScheduler queenPid = do
   link queenPid
-  loop (mkEmptyState queenPid loggerPid)
+  loop $ mkEmptyState queenPid
     where
       loop :: SchedulerS -> Process ()
       loop state = receiveWait [ -- 
-                                 match $ \(QEnqueRequestS (ClientRequest client problem)) -> do
-                                   self <- getSelfPid
-                                   _commanderPid <- spawnLocal $ startCommander self client problem
+                                 match $ \(QEnqueRequestS (ClientRequest _ _)) -> do
+                                   _self <- getSelfPid
                                    loop state
 
                                -- when a new drone registers, the queen tells the scheduler
@@ -41,11 +41,6 @@ runScheduler queenPid loggerPid = do
                                         . resetTask task
                                         . removeBusyDrone drone
                                         . removeAvailableDrone drone
-                                        $ state
-
-                               -- request from a coordinator to add a new task
-                               , match $ \(WTaskS _warrior task) ->
-                                   loop . addTask task
                                         $ state
 
                                , match $ \(DAvailableS drone) ->

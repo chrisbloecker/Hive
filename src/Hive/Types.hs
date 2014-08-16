@@ -3,17 +3,14 @@
 module Hive.Types
   ( Queen
   , Drone
-  , Warrior
   , Client
   , Scheduler
-  , Logger
   , Timeout (unTimeout)
   , milliseconds, seconds, minutes, hours
   , Host
   , Port
-  , CPUInfo
   , Task (..)
-  , Statistics (..)
+  , TaskInfo (..)
   , Problem (..)
   , ProblemType (..)  -- reexporting
   , Instance (..)
@@ -23,12 +20,12 @@ module Hive.Types
 
 -------------------------------------------------------------------------------
 
-import Control.Distributed.Process (Process, ProcessId, Closure)
+import Control.Distributed.Process.Serializable (Serializable)
+import Control.Distributed.Process (Process, ProcessId, Closure, SendPort)
 
-import Data.Binary             (Binary, put, get)
-import Data.Typeable           (Typeable)
-import Data.DeriveTH           (derive, makeBinary)
-import GHC.Generics            (Generic)
+import Hive.Imports.MkBinary
+import Data.Binary (Word8)
+import Control.Monad (liftM2)
 
 import Hive.Problem.Types      ( ProblemType (..)
                                , Problem (..)
@@ -45,24 +42,32 @@ type Port = String
 
 type Queen     = ProcessId
 type Drone     = ProcessId
-type Warrior   = ProcessId
 type Client    = ProcessId
 type Scheduler = ProcessId
-type Logger    = ProcessId
 
-type CPUInfo   = String
+data ClientRequest = ClientRequest Client Problem               deriving (Generic, Typeable)
 
-data ClientRequest = ClientRequest Client Problem      deriving (Generic, Typeable, Show)
-data Task          = Task (Closure (Process ()))       deriving (Generic, Typeable, Show)
+data TaskInfo = TaskInfo JobId StepId                           deriving (Generic, Typeable)
+type JobId    = Integer
+type StepId   = Integer
 
-data Statistics    = Statistics { cpus :: [CPUInfo]
-                                }                      deriving (Generic, Typeable, Show)
+data Task = Task (Closure (Process ())) deriving (Generic, Typeable)
+--data Task a = Task (SendPort a) (Closure a) deriving (Generic, Typeable)
+--data Task a where
+--  Task :: (Serializable a) => (SendPort a) -> (Closure a) -> Task a
+
+--instance Generic  (Task a) where
+--instance Typeable (Task a) where
+
+--instance (Serializable a) => Binary (Task a) where
+--  put (Task sPort closure) = put (0 :: Word8) >> put sPort >> put closure
+--  get = getWord8 >> liftM2 Task get get
 
 -------------------------------------------------------------------------------
 
 $(derive makeBinary ''ClientRequest)
+$(derive makeBinary ''TaskInfo)
 $(derive makeBinary ''Task)
-$(derive makeBinary ''Statistics)
 
 -------------------------------------------------------------------------------
 
