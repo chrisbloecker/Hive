@@ -16,7 +16,8 @@ build-type:          Simple
 cabal-version:       >=1.10
 
 library
-  ghc-options:         -O2 -threaded -ddump-splices
+  ghc-options:         -O2 -threaded  
+  --ddump-splices
   build-depends:       base == 4.*,
                        mtl,
                        text,
@@ -31,11 +32,12 @@ library
                        hashmap,
                        process,
                        time,
-                       distributed-process >= 0.4.2,
+                       distributed-process == 0.5.1,
+                       distributed-process-platform,
                        template-haskell,
                        network-transport,
                        network-transport-tcp,
-                       binary >= 0.5 && < 0.6,
+                       binary >= 0.6.3 && < 0.8,
                        derive >= 2.5 && < 2.6
   -- Compatibility with previous GHC versions.
   if impl(ghc < 7.6)
@@ -49,7 +51,6 @@ library
                        Hive.Process
   other-modules:       Hive.Scheduler
                        Hive.Scheduler.State
-                       Hive.Scheduler.Process
                        Hive.Logger
                        Hive.Messages
                        Hive.NetworkUtils

@@ -7,13 +7,12 @@ module Hive.Process
 -------------------------------------------------------------------------------
 
 import Control.Distributed.Process.Serializable (Serializable)
-
-import Control.Distributed.Process (Closure)
+import qualified Control.Distributed.Process as CH (Process, Closure)
 
 -------------------------------------------------------------------------------
 
 data Process a b where
-  Simple   :: (Serializable a, Serializable b) => (a -> Closure b) -> Process a b
+  Simple   :: (Serializable a, Serializable b) => (a -> CH.Closure (CH.Process b)) -> Process a b
   Sequence :: (Serializable a, Serializable b, Serializable c) => Process a c -> Process c b -> Process a b
   Parallel :: (Serializable a, Serializable b) => Process a b -> Process a b -> (b -> b -> b) -> Process a b
 

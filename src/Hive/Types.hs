@@ -25,7 +25,7 @@ import Control.Distributed.Process (Process, ProcessId, Closure, SendPort)
 
 import Hive.Imports.MkBinary
 import Data.Binary (Word8)
-import Control.Monad (liftM2)
+import Control.Monad (liftM)
 
 import Hive.Problem.Types      ( ProblemType (..)
                                , Problem (..)
@@ -52,7 +52,7 @@ type JobId    = Integer
 type StepId   = Integer
 
 data Task = Task (Closure (Process ())) deriving (Generic, Typeable)
---data Task a = Task (SendPort a) (Closure a) deriving (Generic, Typeable)
+--data T a = T (Closure (Process a)) deriving (Generic, Typeable)
 --data Task a where
 --  Task :: (Serializable a) => (SendPort a) -> (Closure a) -> Task a
 
@@ -60,8 +60,8 @@ data Task = Task (Closure (Process ())) deriving (Generic, Typeable)
 --instance Typeable (Task a) where
 
 --instance (Serializable a) => Binary (Task a) where
---  put (Task sPort closure) = put (0 :: Word8) >> put sPort >> put closure
---  get = getWord8 >> liftM2 Task get get
+--  put (Task closure) = put (0 :: Word8) >> put closure
+--  get = getWord8 >> liftM Task get
 
 -------------------------------------------------------------------------------
 

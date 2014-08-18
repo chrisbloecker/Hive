@@ -26,6 +26,8 @@ import Data.Map (Map)
 import qualified Data.List as L (delete)
 import qualified Data.Map  as M (empty, delete, insert, lookup)
 
+import Control.Distributed.Process.Serializable (Serializable)
+
 -------------------------------------------------------------------------------
 
 data SchedulerS = SchedulerS { queen           :: Queen
@@ -34,7 +36,6 @@ data SchedulerS = SchedulerS { queen           :: Queen
                              , taskAllocation  :: !(Map Drone Task)
                              , queue           :: ![Task]
                              }
-  deriving ()
 
 -------------------------------------------------------------------------------
 

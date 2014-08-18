@@ -52,11 +52,11 @@ runDrone queenHost queenPort workerCount = do
     loop :: DroneState -> Process ()
     loop state@(DroneState {..}) = do
       dronePid <- getSelfPid
-      receiveWait [ match $ \task@(Task _) -> do
-                      send (head workers) task
-                      loop $ state { workers = tail workers }
+      receiveWait [ --match $ \task@(Task _) -> do
+                    --  send (head workers) task
+                    --  loop $ state { workers = tail workers }
 
-                  , match $ \(ProcessMonitorNotification _mon _drone _reason) -> do
+                    match $ \(ProcessMonitorNotification _mon _drone _reason) -> do
                       spawnLocal (worker dronePid) >>= monitor
                       loop state
 
@@ -77,6 +77,6 @@ worker coord = do
       loop :: Drone -> Process ()
       loop drone = do
         send drone =<< DWorkRequestS <$> getSelfPid
-        Task closure <- expect
-        res <- unClosure closure
+        --Task closure <- expect
+        --res <- unClosure closure
         loop drone
