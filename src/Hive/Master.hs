@@ -18,7 +18,7 @@ import Data.List (delete)
 import Hive.Types
 import Hive.NetworkUtils
 import Hive.Imports.MkBinary
-import qualified Hive.Process as Hive (Process (..), BasicProcess (..))
+import qualified Hive.Process as Hive (Process (..))
 
 -------------------------------------------------------------------------------
 
@@ -115,7 +115,8 @@ runMaster = do
     where
       loop :: State -> Process ()
       loop state = receiveWait [ match $ \(NodeUp node) -> do
-                                   say $ "Node up" ++ show node
+                                   say $ "Node up " ++ show node
+                                   _ <- monitorNode node
                                    loop . insertNode node
                                         $ state
 
@@ -124,8 +125,9 @@ runMaster = do
                                    loop . tailNodes
                                         $ state
 
-                               , match $ \(NodeMonitorNotification _monitorRef nodeId _diedReason) -> do
-                                   loop . removeNode nodeId
+                               , match $ \(NodeMonitorNotification _monitorRef node _diedReason) -> do
+                                   say $ "Node down " ++ show node
+                                   loop . removeNode node
                                         $ state
                                ]
 
@@ -134,7 +136,7 @@ runMaster = do
 -------------------------------------------------------------------------------
 
 runProcess :: Master -> Hive.Process a b -> a -> Process b
-runProcess master (Hive.Simple (Hive.BasicProcess sDict closureGen)) x = do
+runProcess master (Hive.Simple sDict closureGen) x = do
   node <- getNode master =<< getSelfPid
   call sDict node (closureGen x)
 

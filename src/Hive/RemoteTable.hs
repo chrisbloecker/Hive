@@ -4,12 +4,11 @@ module Hive.RemoteTable
 
 -------------------------------------------------------------------------------
 
-import Control.Distributed.Process  (RemoteTable)
+import Control.Distributed.Process (RemoteTable)
 
---import qualified Hive.Process.Chain (__remoteTable)
+import qualified Hive.Problem.Arithmetic (__remoteTable)
 
 -------------------------------------------------------------------------------
 
 remoteTable :: RemoteTable -> RemoteTable
-remoteTable = id -- Hive.Process.Chain.__remoteTable
-         -- . otherTables...
+remoteTable =  Hive.Problem.Arithmetic.__remoteTable
