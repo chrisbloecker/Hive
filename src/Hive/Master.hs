@@ -109,11 +109,13 @@ linkMaster (Master master) = link master
 runMaster :: Process ()
 runMaster = do
   self <- getSelfPid
+  register masterName self
   say $ "Master at " ++ show self
   loop $ mkEmptyState
     where
       loop :: State -> Process ()
-      loop state = receiveWait [ match $ \(NodeUp node) ->
+      loop state = receiveWait [ match $ \(NodeUp node) -> do
+                                   say $ "Node up" ++ show node
                                    loop . insertNode node
                                         $ state
 
