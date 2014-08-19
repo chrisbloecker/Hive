@@ -20,10 +20,9 @@ import GHC.Generics     (Generic)
 data ProblemType  = ARITH -- Arithmetic Expression
                   | TSP   -- Traveling Salesman Problem
                   | SSSP  -- Single Source Shortest Path
-                  | APSP  -- All Pair Shortest Path
   deriving (Eq, Show, Enum, Bounded, Generic, Typeable)
 
-newtype Instance = Instance { unInstance :: Text }           deriving (Generic, Typeable, Show)
+newtype Instance = Instance { unInstance :: Text } deriving (Generic, Typeable, Show)
 
 data Solution = Solution { unSolution :: Text
                          , unValue    :: Int

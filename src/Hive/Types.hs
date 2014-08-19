@@ -1,37 +1,19 @@
 {-# LANGUAGE TemplateHaskell, DeriveGeneric, DeriveDataTypeable #-}
 
 module Hive.Types
-  ( Queen
-  , Drone
-  , Client
-  , Scheduler
-  , Timeout (unTimeout)
+  ( Timeout (unTimeout)
   , milliseconds, seconds, minutes, hours
   , Host
   , Port
-  , Task (..)
-  , TaskInfo (..)
   , Problem (..)
   , ProblemType (..)  -- reexporting
   , Instance (..)
   , Solution (..)
-  , ClientRequest (..)
   ) where
 
 -------------------------------------------------------------------------------
 
-import Control.Distributed.Process.Serializable (Serializable)
-import Control.Distributed.Process (Process, ProcessId, Closure, SendPort)
-
-import Hive.Imports.MkBinary
-import Data.Binary (Word8)
-import Control.Monad (liftM)
-
-import Hive.Problem.Types      ( ProblemType (..)
-                               , Problem (..)
-                               , Instance (..)
-                               , Solution (..)
-                               )
+import Hive.Problem.Types
 
 -------------------------------------------------------------------------------
 
@@ -40,18 +22,7 @@ newtype Timeout = Timeout { unTimeout :: Int }  deriving (Eq, Show)
 type Host = String
 type Port = String
 
-type Queen     = ProcessId
-type Drone     = ProcessId
-type Client    = ProcessId
-type Scheduler = ProcessId
-
-data ClientRequest = ClientRequest Client Problem               deriving (Generic, Typeable)
-
-data TaskInfo = TaskInfo JobId StepId                           deriving (Generic, Typeable)
-type JobId    = Integer
-type StepId   = Integer
-
-data Task = Task (Closure (Process ())) deriving (Generic, Typeable)
+--data Task = Task (Closure (Process ())) deriving (Generic, Typeable)
 --data T a = T (Closure (Process a)) deriving (Generic, Typeable)
 --data Task a where
 --  Task :: (Serializable a) => (SendPort a) -> (Closure a) -> Task a
@@ -62,12 +33,6 @@ data Task = Task (Closure (Process ())) deriving (Generic, Typeable)
 --instance (Serializable a) => Binary (Task a) where
 --  put (Task closure) = put (0 :: Word8) >> put closure
 --  get = getWord8 >> liftM Task get
-
--------------------------------------------------------------------------------
-
-$(derive makeBinary ''ClientRequest)
-$(derive makeBinary ''TaskInfo)
-$(derive makeBinary ''Task)
 
 -------------------------------------------------------------------------------
 

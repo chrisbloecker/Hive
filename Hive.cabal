@@ -2,7 +2,7 @@
 --  see http://haskell.org/cabal/users-guide/
 
 name:                Hive
-version:             0.1.1.2
+version:             0.2.0.0
 -- synopsis:            
 -- description:         
 license:             GPL-3
@@ -16,8 +16,7 @@ build-type:          Simple
 cabal-version:       >=1.10
 
 library
-  ghc-options:         -O2 -threaded  
-  --ddump-splices
+  ghc-options:         -O2 -threaded
   build-depends:       base == 4.*,
                        mtl,
                        text,
@@ -33,7 +32,6 @@ library
                        process,
                        time,
                        distributed-process == 0.5.1,
-                       distributed-process-platform,
                        template-haskell,
                        network-transport,
                        network-transport-tcp,
@@ -42,17 +40,13 @@ library
   -- Compatibility with previous GHC versions.
   if impl(ghc < 7.6)
     build-depends: ghc-prim
-  exposed-modules:     Hive.Queen
-                       Hive.Drone
+  exposed-modules:     Hive.Master
+                       Hive.Node
                        Hive.Client
                        Hive.Types
                        Hive.RemoteTable
                        Hive.Problem.Types
                        Hive.Process
-  other-modules:       Hive.Scheduler
-                       Hive.Scheduler.State
-                       Hive.Logger
-                       Hive.Messages
-                       Hive.NetworkUtils
+  other-modules:       Hive.NetworkUtils
   hs-source-dirs:      src
   default-language:    Haskell2010
