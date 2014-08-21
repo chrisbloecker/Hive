@@ -1,4 +1,5 @@
 {-# LANGUAGE ScopedTypeVariables, RecordWildCards, DeriveGeneric, DeriveDataTypeable #-}
+
 module Hive.Master
   ( Ticket
   , runMaster
@@ -26,9 +27,10 @@ newtype Master = Master ProcessId deriving (Eq)
 instance Show Master where
   show (Master pid) = show pid
 
-newtype Ticket = Ticket Int deriving (Eq)
+newtype Ticket = Ticket { unTicket :: Int } deriving (Eq, Generic, Typeable)
 instance Show Ticket where
   show (Ticket t) = show t
+instance Binary Ticket where
 
 data State = State { nodes  :: ![NodeId]
                    , ticket :: !Ticket
@@ -49,6 +51,9 @@ instance Binary NodeDown where
 
 data ReceiveNode = ReceiveNode NodeId deriving (Generic, Typeable)
 instance Binary ReceiveNode where
+
+data Reqeust = Reqeust ProcessId Problem deriving (Generic, Typeable)
+instance Binary Reqeust where
 
 -------------------------------------------------------------------------------
 -- handle the state
@@ -75,6 +80,12 @@ peakNode (State {..}) = head nodes
 tailNodes :: State -> State
 tailNodes s@(State {..}) = s { nodes = tail nodes }
 
+getTicket :: State -> Ticket
+getTicket (State {..}) = ticket
+
+nextTicket :: State -> State
+nextTicket s@(State {..}) = s { ticket = Ticket (unTicket ticket + 1) }
+
 -------------------------------------------------------------------------------
 -- helper functions to keep messages to scheduler clean
 -------------------------------------------------------------------------------
@@ -89,7 +100,10 @@ getNode (Master master) asker = do
   return nodeId
 
 request :: Master -> Problem -> Process Ticket
-request = undefined
+request (Master master) problem = do
+  self <- getSelfPid
+  send master (Reqeust self problem)
+  expect
 
 -------------------------------------------------------------------------------
 -- behaviour of the master
@@ -125,11 +139,25 @@ runMaster = do
                                    loop . tailNodes
                                         $ state
 
+                               , match $ \(Reqeust client problem) -> do
+                                   say $ "Request from " ++ show client
+                                   flip send problem =<< spawnLocal problemHandler
+                                   send client (getTicket state)
+                                   loop . nextTicket
+                                        $ state
+
                                , match $ \(NodeMonitorNotification _monitorRef node _diedReason) -> do
                                    say $ "Node down " ++ show node
                                    loop . removeNode node
                                         $ state
                                ]
+
+-------------------------------------------------------------------------------
+
+problemHandler :: (Master, Problem) -> Process ()
+problemHandler (master, problem) = do
+  
+
 
 -------------------------------------------------------------------------------
 -- interpretation of Process structure
@@ -140,12 +168,15 @@ runProcess master (Hive.Simple sDict closureGen) x = do
   node <- getNode master =<< getSelfPid
   call sDict node (closureGen x)
 
-runProcess scheduler (Hive.Sequence p1 p2) x = do
-  runProcess scheduler p1 x >>= runProcess scheduler p2
+runProcess master (Hive.Choice p p1 p2) x =
+  runProcess master (if p x then p1 else p2) x
 
-runProcess scheduler (Hive.Parallel p1 p2 g) x = do
-  helper (runProcess scheduler p1 x)
-  helper (runProcess scheduler p2 x)
+runProcess master (Hive.Sequence p1 p2) x = do
+  runProcess master p1 x >>= runProcess master p2
+
+runProcess master (Hive.Parallel p1 p2 g) x = do
+  helper (runProcess master p1 x)
+  helper (runProcess master p2 x)
   res1 <- expect
   res2 <- expect
   return $ res1 `g` res2
