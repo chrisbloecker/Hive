@@ -48,6 +48,7 @@ library
                        Hive.Problem.Types
                        Hive.Process
   other-modules:       Hive.NetworkUtils
+                       Hive.Problem
                        Hive.Problem.Arithmetic
                        Hive.Problem.Arithmetic.Model
   hs-source-dirs:      src
