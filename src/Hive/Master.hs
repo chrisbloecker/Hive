@@ -1,4 +1,4 @@
-{-# LANGUAGE ScopedTypeVariables, RecordWildCards, DeriveGeneric, DeriveDataTypeable #-}
+{-# LANGUAGE TemplateHaskell, ScopedTypeVariables, RecordWildCards, DeriveGeneric, DeriveDataTypeable #-}
 
 module Hive.Master
   ( Ticket
@@ -8,11 +8,13 @@ module Hive.Master
   , findMaster
   , linkMaster
   , request
+  , __remoteTable
   ) where
 
 -------------------------------------------------------------------------------
 
 import Control.Distributed.Process
+import Control.Distributed.Process.Closure (remotable, mkClosure)
 
 import Data.List (delete)
 
@@ -23,9 +25,10 @@ import qualified Hive.Process as Hive (Process (..))
 
 -------------------------------------------------------------------------------
 
-newtype Master = Master ProcessId deriving (Eq)
+newtype Master = Master ProcessId deriving (Eq, Generic, Typeable)
 instance Show Master where
   show (Master pid) = show pid
+instance Binary Master where
 
 newtype Ticket = Ticket { unTicket :: Int } deriving (Eq, Generic, Typeable)
 instance Show Ticket where
@@ -106,6 +109,14 @@ request (Master master) problem = do
   expect
 
 -------------------------------------------------------------------------------
+
+problemHandler :: (Master, Ticket, Problem) -> Process ()
+problemHandler (master, ticket, problem) = do
+  return ()
+
+remotable ['problemHandler]
+
+-------------------------------------------------------------------------------
 -- behaviour of the master
 -------------------------------------------------------------------------------
 
@@ -141,23 +152,18 @@ runMaster = do
 
                                , match $ \(Reqeust client problem) -> do
                                    say $ "Request from " ++ show client
-                                   flip send problem =<< spawnLocal problemHandler
-                                   send client (getTicket state)
+                                   let ticket = getTicket state
+                                   self <- getSelfPid
+                                   (pid, mon) <- flip spawnMonitor ($(mkClosure 'problemHandler) (Master self, ticket, problem)) =<< getSelfNode
+                                   send client ticket
                                    loop . nextTicket
                                         $ state
 
-                               , match $ \(NodeMonitorNotification _monitorRef node _diedReason) -> do
-                                   say $ "Node down " ++ show node
+                               , match $ \(NodeMonitorNotification _monitorRef node diedReason) -> do
+                                   say $ "Node down " ++ show node ++ " for the following reason: " ++ show diedReason
                                    loop . removeNode node
                                         $ state
                                ]
-
--------------------------------------------------------------------------------
-
-problemHandler :: (Master, Problem) -> Process ()
-problemHandler (master, problem) = do
-  
-
 
 -------------------------------------------------------------------------------
 -- interpretation of Process structure

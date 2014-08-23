@@ -15,7 +15,7 @@ data Expr = Val Int
           | Sub Expr Expr
           | Mul Expr Expr
           | Div Expr Expr
-  deriving (Generic, Typeable, Eq, Show)
+  deriving (Generic, Typeable, Eq, Show, Read)
 
 instance Binary Expr where
 
