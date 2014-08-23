@@ -5,6 +5,7 @@ module Hive.Types
   , milliseconds, seconds, minutes, hours
   , Host
   , Port
+  , Master (..)
   , Problem (..)
   , ProblemType (..)  -- reexporting
   , Instance (..)
@@ -13,7 +14,10 @@ module Hive.Types
 
 -------------------------------------------------------------------------------
 
+import Hive.Imports.MkBinary
 import Hive.Problem.Types
+
+import Control.Distributed.Process (ProcessId)
 
 -------------------------------------------------------------------------------
 
@@ -22,17 +26,10 @@ newtype Timeout = Timeout { unTimeout :: Int }  deriving (Eq, Show)
 type Host = String
 type Port = String
 
---data Task = Task (Closure (Process ())) deriving (Generic, Typeable)
---data T a = T (Closure (Process a)) deriving (Generic, Typeable)
---data Task a where
---  Task :: (Serializable a) => (SendPort a) -> (Closure a) -> Task a
-
---instance Generic  (Task a) where
---instance Typeable (Task a) where
-
---instance (Serializable a) => Binary (Task a) where
---  put (Task closure) = put (0 :: Word8) >> put closure
---  get = getWord8 >> liftM Task get
+newtype Master = Master ProcessId deriving (Eq, Generic, Typeable)
+instance Show Master where
+  show (Master pid) = show pid
+instance Binary Master where
 
 -------------------------------------------------------------------------------
 

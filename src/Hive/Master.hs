@@ -3,36 +3,31 @@
 module Hive.Master
   ( Ticket
   , runMaster
-  , runProcess
   , nodeUp
   , findMaster
   , linkMaster
   , request
+  , getNode
   , __remoteTable
   ) where
 
 -------------------------------------------------------------------------------
 
-import Control.Distributed.Process
+import Control.Distributed.Process hiding  (closure)
 import Control.Distributed.Process.Closure (remotable, mkClosure)
 
 import Data.Map (Map)
 
 import Hive.Types
-import Hive.Problem
+import Hive.Problem (handle)
 import Hive.NetworkUtils
 import Hive.Imports.MkBinary
+import Hive.Master.Messaging
 
 import qualified Data.Map.Strict as M    (empty, insert, delete, lookup)
 import qualified Data.List       as L    (delete)
-import qualified Hive.Process    as Hive (Process (..))
 
 -------------------------------------------------------------------------------
-
-newtype Master = Master ProcessId deriving (Eq, Generic, Typeable)
-instance Show Master where
-  show (Master pid) = show pid
-instance Binary Master where
 
 newtype Ticket = Ticket { unTicket :: Int } deriving (Eq, Generic, Typeable)
 instance Show Ticket where
@@ -48,17 +43,11 @@ data State = State { nodes  :: ![NodeId]
 -- we will only react to these messages, all others can be thrown away
 -------------------------------------------------------------------------------
 
-data GetNode = GetNode ProcessId deriving (Generic, Typeable)
-instance Binary GetNode where
-
 data NodeUp = NodeUp NodeId deriving (Generic, Typeable)
 instance Binary NodeUp where
 
 data NodeDown = NodeDown NodeId deriving (Generic, Typeable)
 instance Binary NodeDown where
-
-data ReceiveNode = ReceiveNode NodeId deriving (Generic, Typeable)
-instance Binary ReceiveNode where
 
 data Request = Request ProcessId Problem deriving (Generic, Typeable)
 instance Binary Request where
@@ -113,12 +102,6 @@ deregisterJob pid s@(State {..}) = s { active = M.delete pid active }
 nodeUp :: Master -> NodeId -> Process ()
 nodeUp (Master master) node = send master (NodeUp node)
 
-getNode :: Master -> ProcessId -> Process NodeId
-getNode (Master master) asker = do
-  send master (GetNode asker)
-  ReceiveNode nodeId <- expect
-  return nodeId
-
 request :: Master -> Problem -> Process Ticket
 request (Master master) problem = do
   self <- getSelfPid
@@ -133,7 +116,7 @@ problemHandler (Master master, ticket, problem) = do
   say $ "Master:  " ++ show master
   say $ "Ticket:  " ++ show ticket
   say $ "Problem: " ++ show problem
-  let solution = handle problem
+  solution <- handle problem (Master master)
   self <- getSelfPid
   send master (TicketDone self ticket solution)
   return ()
@@ -205,27 +188,3 @@ runMaster = do
                                    loop . removeNode node
                                         $ state
                                ]
-
--------------------------------------------------------------------------------
--- interpretation of Process structure
--------------------------------------------------------------------------------
-
-runProcess :: Master -> Hive.Process a b -> a -> Process b
-runProcess master (Hive.Simple sDict closureGen) x = do
-  node <- getNode master =<< getSelfPid
-  call sDict node (closureGen x)
-
-runProcess master (Hive.Choice p p1 p2) x =
-  runProcess master (if p x then p1 else p2) x
-
-runProcess master (Hive.Sequence p1 p2) x = do
-  runProcess master p1 x >>= runProcess master p2
-
-runProcess master (Hive.Parallel p1 p2 g) x = do
-  helper (runProcess master p1 x)
-  helper (runProcess master p2 x)
-  res1 <- expect
-  res2 <- expect
-  return $ res1 `g` res2
-    where
-      helper = undefined

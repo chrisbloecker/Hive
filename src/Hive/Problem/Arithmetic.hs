@@ -2,10 +2,8 @@
 
 module Hive.Problem.Arithmetic
   ( __remoteTable
-  , addProcess
-  , subtractProcess
-  , multiplyProcess
-  , divideProcess
+  , parse
+  , interpret
   ) where
 
 -------------------------------------------------------------------------------
@@ -13,11 +11,39 @@ module Hive.Problem.Arithmetic
 import Control.Distributed.Process.Closure      (mkClosure, mkStatic, remotable)
 import Control.Distributed.Process.Serializable (SerializableDict(SerializableDict))
 
+import Hive.Interface
+
 import qualified Control.Distributed.Process as CH (Process)
 
-import Hive.Process (Process(Simple))
+-------------------------------------------------------------------------------
+-- the data model
+-------------------------------------------------------------------------------
+
+data Expr = Val Int
+          | Add Expr Expr
+          | Sub Expr Expr
+          | Mul Expr Expr
+          | Div Expr Expr
+  deriving (Eq, Show, Read)
+
+parse :: String -> Expr
+parse = read
 
 -------------------------------------------------------------------------------
+
+eval :: Expr -> Int
+eval (Val i) = i
+eval (Add x y) = eval x + eval y
+eval (Sub x y) = eval x - eval y
+eval (Mul x y) = eval x * eval y
+eval (Div x y) = eval x `div` eval y
+
+-------------------------------------------------------------------------------
+--
+-------------------------------------------------------------------------------
+
+val :: Int -> CH.Process Int
+val i = return i
 
 add :: (Int, Int) -> CH.Process Int
 add (x, y) = return (x + y)
@@ -37,18 +63,32 @@ intDict = SerializableDict
 
 -------------------------------------------------------------------------------
 
-remotable ['add, 'subtract, 'multiply, 'divide, 'intDict]
+remotable ['val, 'add, 'subtract, 'multiply, 'divide, 'intDict]
 
 -------------------------------------------------------------------------------
 
+valProcess :: Int -> Process Int Int
+valProcess i = mkConst $(mkStatic 'intDict) ($(mkClosure 'val) i)
+
 addProcess :: Process (Int, Int) Int
-addProcess = Simple $(mkStatic 'intDict) $(mkClosure 'add)
+addProcess = mkSimple $(mkStatic 'intDict) $(mkClosure 'add)
 
 subtractProcess :: Process (Int, Int) Int
-subtractProcess = Simple $(mkStatic 'intDict) $(mkClosure 'subtract)
+subtractProcess = mkSimple $(mkStatic 'intDict) $(mkClosure 'subtract)
 
 multiplyProcess :: Process (Int, Int) Int
-multiplyProcess = Simple $(mkStatic 'intDict) $(mkClosure 'multiply)
+multiplyProcess = mkSimple $(mkStatic 'intDict) $(mkClosure 'multiply)
 
 divideProcess :: Process (Int, Int) Int
-divideProcess = Simple $(mkStatic 'intDict) $(mkClosure 'divide)
+divideProcess = mkSimple $(mkStatic 'intDict) $(mkClosure 'divide)
+
+-------------------------------------------------------------------------------
+-- interpretation of an Expr in form of a Process
+-------------------------------------------------------------------------------
+
+interpret :: Expr -> Process Int Int
+interpret (Val i)   = valProcess i
+interpret (Add x y) = mkParallel (interpret x) (interpret y) addProcess
+interpret (Sub x y) = mkParallel (interpret x) (interpret y) subtractProcess
+interpret (Mul x y) = mkParallel (interpret x) (interpret y) multiplyProcess
+interpret (Div x y) = mkParallel (interpret x) (interpret y) divideProcess

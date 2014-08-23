@@ -24,9 +24,7 @@ data ProblemType  = ARITH -- Arithmetic Expression
 
 newtype Instance = Instance { unInstance :: Text } deriving (Generic, Typeable, Show)
 
-data Solution = Solution { unSolution :: Text
-                         , unValue    :: Int
-                         }
+data Solution = Solution { unSolution :: Text }
               | NoSolution
               | InvalidInput
               | TimeoutReached
