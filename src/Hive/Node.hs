@@ -33,13 +33,13 @@ terminateNode node = send node Terminate
 -------------------------------------------------------------------------------
 
 runNode :: String -> String -> Int -> Process ()
-runNode masterHost masterPort _nodeCount = do
+runNode masterHost masterPort workerCount = do
   thisNode <- getSelfNode
   mMaster  <- findMaster masterHost masterPort (seconds 1)
   case mMaster of
     Nothing     -> liftIO . putStrLn $ "No master found... Terminating..."
     Just master -> do
-      nodeUp master thisNode
+      nodeUp master thisNode workerCount
       linkMaster master
       Terminate <- expect
       return ()

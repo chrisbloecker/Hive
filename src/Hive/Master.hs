@@ -43,7 +43,7 @@ data State = State { nodes  :: ![NodeId]
 -- we will only react to these messages, all others can be thrown away
 -------------------------------------------------------------------------------
 
-data NodeUp = NodeUp NodeId deriving (Generic, Typeable)
+data NodeUp = NodeUp NodeId Int deriving (Generic, Typeable)
 instance Binary NodeUp where
 
 data NodeDown = NodeDown NodeId deriving (Generic, Typeable)
@@ -99,8 +99,8 @@ deregisterJob pid s@(State {..}) = s { active = M.delete pid active }
 -- helper functions to keep messages to scheduler clean
 -------------------------------------------------------------------------------
 
-nodeUp :: Master -> NodeId -> Process ()
-nodeUp (Master master) node = send master (NodeUp node)
+nodeUp :: Master -> NodeId -> Int -> Process ()
+nodeUp (Master master) node workerCount = send master (NodeUp node workerCount)
 
 request :: Master -> Problem -> Process Ticket
 request (Master master) problem = do
@@ -146,9 +146,13 @@ runMaster = do
   loop $ mkEmptyState
     where
       loop :: State -> Process ()
-      loop state = receiveWait [ match $ \(NodeUp node) -> do
-                                   say $ "Node up " ++ show node
+      loop state = receiveWait [ match $ \(NodeUp node workerCount) -> do
+                                   say $ "Node up: " ++ show node
                                    _ <- monitorNode node
+                                   let state' = foldr (\_ s -> insertNode node s) state [1..workerCount]
+                                   loop state'
+
+                               , match $ \(ReturnNode node) ->
                                    loop . insertNode node
                                         $ state
 

@@ -13,8 +13,14 @@ instance Binary GetNode where
 data ReceiveNode = ReceiveNode NodeId deriving (Generic, Typeable)
 instance Binary ReceiveNode where
 
+data ReturnNode = ReturnNode NodeId deriving (Generic, Typeable)
+instance Binary ReturnNode where
+
 getNode :: Master -> ProcessId -> Process NodeId
 getNode (Master master) asker = do
   send master (GetNode asker)
   ReceiveNode nodeId <- expect
   return nodeId
+
+returnNode :: Master -> NodeId -> Process ()
+returnNode (Master master) node = send master (ReturnNode node)
