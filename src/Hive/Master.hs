@@ -1,8 +1,7 @@
 {-# LANGUAGE TemplateHaskell, ScopedTypeVariables, RecordWildCards, DeriveGeneric, DeriveDataTypeable #-}
 
 module Hive.Master
-  ( Ticket
-  , runMaster
+  ( runMaster
   , nodeUp
   , findMaster
   , linkMaster
@@ -16,96 +15,14 @@ module Hive.Master
 import Control.Distributed.Process hiding  (closure)
 import Control.Distributed.Process.Closure (remotable, mkClosure)
 
-import Data.Map (Map)
-
 import Hive.Types
 import Hive.Problem (handle)
 import Hive.NetworkUtils
-import Hive.Imports.MkBinary
+
+-- we will only react to messages defined in Hive.Master.Messaging
+-- other messages will be thrown away
 import Hive.Master.Messaging
-
-import qualified Data.Map as M (empty, insert, delete, lookup)
-
--------------------------------------------------------------------------------
-
-newtype Ticket = Ticket { unTicket :: Int } deriving (Eq, Generic, Typeable)
-instance Show Ticket where
-  show (Ticket t) = show t
-instance Binary Ticket where
-
-data State = State { nodes  :: ![NodeId]
-                   , ticket :: !Ticket
-                   , active :: !(Map ProcessId (Ticket, MonitorRef))
-                   }
-
--------------------------------------------------------------------------------
--- we will only react to these messages, all others can be thrown away
--------------------------------------------------------------------------------
-
-data NodeUp = NodeUp NodeId Int deriving (Generic, Typeable)
-instance Binary NodeUp where
-
-data NodeDown = NodeDown NodeId deriving (Generic, Typeable)
-instance Binary NodeDown where
-
-data Request = Request ProcessId Problem deriving (Generic, Typeable)
-instance Binary Request where
-
-data TicketDone = TicketDone ProcessId Ticket Solution deriving (Generic, Typeable)
-instance Binary TicketDone where
-
--------------------------------------------------------------------------------
--- handle the state
--------------------------------------------------------------------------------
-
-mkTicket :: Int -> Ticket
-mkTicket = Ticket
-
-mkEmptyState :: State
-mkEmptyState = State [] (mkTicket 0) M.empty
-
-insertNode :: NodeId -> State -> State
-insertNode n s@(State {..}) = s { nodes = n:nodes }
-
-removeNode :: NodeId -> State -> State
-removeNode n s@(State {..}) = s { nodes = filter (/= n) nodes }
-
-nodeCount :: State -> Int
-nodeCount (State {..}) = length nodes
-
-peakNode :: State -> NodeId
-peakNode (State {..}) = head nodes
-
-tailNodes :: State -> State
-tailNodes s@(State {..}) = s { nodes = tail nodes }
-
-getTicket :: State -> Ticket
-getTicket (State {..}) = ticket
-
-nextTicket :: State -> State
-nextTicket s@(State {..}) = s { ticket = Ticket (unTicket ticket + 1) }
-
-getMonitor :: ProcessId -> State -> Maybe MonitorRef
-getMonitor pid (State {..}) = M.lookup pid active >>= Just . snd
-
-registerJob :: ProcessId -> Ticket -> MonitorRef -> State -> State
-registerJob pid t mon s@(State {..}) = s { active = M.insert pid (t, mon) active }
-
-deregisterJob :: ProcessId -> State -> State
-deregisterJob pid s@(State {..}) = s { active = M.delete pid active }
-
--------------------------------------------------------------------------------
--- helper functions to keep messages to scheduler clean
--------------------------------------------------------------------------------
-
-nodeUp :: Master -> NodeId -> Int -> Process ()
-nodeUp (Master master) node workerCount = send master (NodeUp node workerCount)
-
-request :: Master -> Problem -> Process Ticket
-request (Master master) problem = do
-  self <- getSelfPid
-  send master (Request self problem)
-  expect
+import Hive.Master.State
 
 -------------------------------------------------------------------------------
 

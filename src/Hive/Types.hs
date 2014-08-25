@@ -6,6 +6,8 @@ module Hive.Types
   , Host
   , Port
   , Master (..)
+  , Ticket (unTicket)
+  , mkTicket
   , Problem (..)
   , ProblemType (..)  -- reexporting
   , Instance (..)
@@ -31,6 +33,11 @@ instance Show Master where
   show (Master pid) = show pid
 instance Binary Master where
 
+newtype Ticket = Ticket { unTicket :: Int } deriving (Eq, Generic, Typeable)
+instance Show Ticket where
+  show (Ticket t) = show t
+instance Binary Ticket where
+
 -------------------------------------------------------------------------------
 
 milliseconds :: Int -> Timeout
@@ -44,3 +51,6 @@ minutes m = seconds (60 * m)
 
 hours :: Int -> Timeout
 hours h = minutes (60 * h)
+
+mkTicket :: Int -> Ticket
+mkTicket = Ticket
