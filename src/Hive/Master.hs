@@ -24,8 +24,7 @@ import Hive.NetworkUtils
 import Hive.Imports.MkBinary
 import Hive.Master.Messaging
 
-import qualified Data.Map.Strict as M    (empty, insert, delete, lookup)
-import qualified Data.List       as L    (delete)
+import qualified Data.Map.Strict as M (empty, insert, delete, lookup)
 
 -------------------------------------------------------------------------------
 
@@ -69,7 +68,7 @@ insertNode :: NodeId -> State -> State
 insertNode n s@(State {..}) = s { nodes = n:nodes }
 
 removeNode :: NodeId -> State -> State
-removeNode n s@(State {..}) = s { nodes = n `L.delete` nodes }
+removeNode n s@(State {..}) = s { nodes = filter (/= n) nodes }
 
 nodeCount :: State -> Int
 nodeCount (State {..}) = length nodes
