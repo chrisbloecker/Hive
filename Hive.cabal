@@ -28,12 +28,12 @@ library
                        hashmap,
                        process,
                        time,
-                       distributed-process == 0.5.1,
-                       template-haskell,
+                       distributed-process    == 0.5.1,
+                       template-haskell       == 2.8.0.0,
                        network-transport,
                        network-transport-tcp,
-                       binary >= 0.6.3 && < 0.8,
-                       derive >= 2.5 && < 2.6
+                       binary                 >= 0.6.3 && < 0.8,
+                       derive                 >= 2.5   && < 2.6
   -- Compatibility with previous GHC versions.
   if impl(ghc < 7.6)
     build-depends: ghc-prim
