@@ -24,7 +24,7 @@ import Hive.NetworkUtils
 import Hive.Imports.MkBinary
 import Hive.Master.Messaging
 
-import qualified Data.Map.Strict as M (empty, insert, delete, lookup)
+import qualified Data.Map as M (empty, insert, delete, lookup)
 
 -------------------------------------------------------------------------------
 
