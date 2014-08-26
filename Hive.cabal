@@ -33,7 +33,10 @@ library
                        network-transport,
                        network-transport-tcp,
                        binary                 >= 0.6.3 && < 0.8,
-                       derive                 >= 2.5   && < 2.6
+                       derive                 >= 2.5   && < 2.6,
+                       acid-state             >= 0.2.12,
+                       ixset                  >= 1.0.5,
+                       safecopy               >= 0.8.3
   -- Compatibility with previous GHC versions.
   if impl(ghc < 7.6)
     build-depends: ghc-prim
@@ -46,6 +49,7 @@ library
   other-modules:       Hive.Process
                        Hive.Master.Messaging
                        Hive.Master.State
+                       Hive.Master.Persistent
                        Hive.NetworkUtils
                        Hive.Problem
                        Hive.Problem.Types

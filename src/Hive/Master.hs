@@ -15,6 +15,8 @@ module Hive.Master
 import Control.Distributed.Process hiding  (closure)
 import Control.Distributed.Process.Closure (remotable, mkClosure)
 
+import Data.Acid (openLocalState)
+
 import Hive.Types
 import Hive.Problem (handle)
 import Hive.NetworkUtils
@@ -23,6 +25,7 @@ import Hive.NetworkUtils
 -- other messages will be thrown away
 import Hive.Master.Messaging
 import Hive.Master.State
+import Hive.Master.Persistent
 
 -------------------------------------------------------------------------------
 
@@ -57,6 +60,7 @@ linkMaster (Master master) = link master
 runMaster :: Process ()
 runMaster = do
   self <- getSelfPid
+  db   <- liftIO $ openLocalState initDatabase
   register masterName self
   say $ "Master at " ++ show self
   loop $ mkEmptyState

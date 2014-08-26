@@ -16,6 +16,8 @@ module Hive.Types
 
 -------------------------------------------------------------------------------
 
+import Data.Data
+
 import Hive.Imports.MkBinary
 import Hive.Problem.Types
 
@@ -29,11 +31,13 @@ type Host = String
 type Port = String
 
 newtype Master = Master ProcessId deriving (Eq, Generic, Typeable)
+
 instance Show Master where
   show (Master pid) = show pid
 instance Binary Master where
 
-newtype Ticket = Ticket { unTicket :: Int } deriving (Eq, Generic, Typeable)
+newtype Ticket = Ticket { unTicket :: Int } deriving (Eq, Ord, Data, Generic, Typeable)
+
 instance Show Ticket where
   show (Ticket t) = show t
 instance Binary Ticket where

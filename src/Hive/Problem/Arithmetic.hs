@@ -2,6 +2,7 @@
 
 module Hive.Problem.Arithmetic
   ( __remoteTable
+  , Expr (..)
   , parse
   , interpret
   ) where
@@ -12,6 +13,7 @@ import Control.Distributed.Process.Closure      (mkClosure, mkStatic, remotable)
 import Control.Distributed.Process.Serializable (SerializableDict(SerializableDict))
 
 import Hive.Interface
+import Hive.Imports.DeriveJSON
 
 import qualified Control.Distributed.Process as CH (Process)
 
@@ -25,6 +27,8 @@ data Expr = Val Int
           | Mul Expr Expr
           | Div Expr Expr
   deriving (Eq, Show, Read)
+
+$(deriveJSON defaultOptions ''Expr)
 
 parse :: String -> Expr
 parse = read

@@ -7,10 +7,10 @@ module Hive.Problem.Types
   , Solution (..)
   ) where
 
+import Data.Data
 import Data.Text.Lazy   (Text)
 import Data.Text.Binary ()
 import Data.Binary      (Binary, put, putWord8, get, getWord8)
-import Data.Typeable    (Typeable)
 import Data.DeriveTH    (derive, makeBinary)
 import Data.Aeson.TH    (deriveJSON, defaultOptions)
 import GHC.Generics     (Generic)
@@ -20,21 +20,21 @@ import GHC.Generics     (Generic)
 data ProblemType  = ARITH -- Arithmetic Expression
                   | TSP   -- Traveling Salesman Problem
                   | SSSP  -- Single Source Shortest Path
-  deriving (Eq, Show, Enum, Bounded, Generic, Typeable)
+  deriving (Eq, Ord, Show, Enum, Bounded, Data, Generic, Typeable)
 
-newtype Instance = Instance { unInstance :: Text } deriving (Generic, Typeable, Show)
+newtype Instance = Instance { unInstance :: Text } deriving (Eq, Ord, Data, Generic, Typeable, Show)
 
 data Solution = Solution { unSolution :: Text }
               | NoSolution
               | InvalidInput
               | TimeoutReached
               | NotImplemented
-  deriving (Generic, Typeable, Show)
+  deriving (Eq, Ord, Data, Generic, Typeable, Show)
 
 data Problem = Problem  { problemType :: ProblemType
                         , inst        :: Instance
                         }
-  deriving (Generic, Typeable, Show)
+  deriving (Eq, Ord, Data, Generic, Typeable, Show)
 
 -------------------------------------------------------------------------------
 
