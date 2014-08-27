@@ -1,4 +1,4 @@
-{-# LANGUAGE TemplateHaskell, TypeFamilies, RecordWildCards, DeriveDataTypeable #-}
+{-# LANGUAGE TemplateHaskell, TypeFamilies, RecordWildCards, DeriveDataTypeable, DeriveGeneric #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module Hive.Master.Persistent
@@ -6,26 +6,19 @@ module Hive.Master.Persistent
 
 -------------------------------------------------------------------------------
 
-import Control.Monad.Reader (ask)
-import Control.Monad.State  (get, put)
+import qualified Control.Monad.Reader as R  (ask)
+import qualified Control.Monad.State  as ST (get, put)
 
 -------------------------------------------------------------------------------
 
 import Data.Acid
 import Data.IxSet
-import Data.Typeable
 import Data.Data
 import Data.SafeCopy
 
 import Hive.Types
 
 -------------------------------------------------------------------------------
-
-data Entry = Entry { ticket   :: Ticket
-                   , problem  :: Problem
-                   , solution :: Maybe Solution
-                   }
-  deriving (Eq, Ord, Data, Typeable)
 
 data Database = Database { ticketSeq :: Ticket
                          , entries   :: IxSet Entry
@@ -53,64 +46,45 @@ instance Indexable Entry where
 
 -------------------------------------------------------------------------------
 
-mkEntry :: Ticket -> Problem -> Maybe Solution -> Entry
-mkEntry = Entry
-
--------------------------------------------------------------------------------
-
 initDatabase :: Database
 initDatabase = Database { ticketSeq = mkTicket 0
                         , entries   = empty
                         }
 
-getDatabase :: Query Database Database
-getDatabase = ask
-
-putDatabase :: Database -> Update Database ()
-putDatabase = put
-
 getTicketSeq :: Query Database Ticket
 getTicketSeq = do
-  Database{..} <- ask
+  Database{..} <- R.ask
   return ticketSeq
 
 updateTicketSeq :: Ticket -> Update Database ()
 updateTicketSeq t = do
-  db@Database{..} <- get
-  put $ db { ticketSeq = t }
+  db@Database{..} <- ST.get
+  ST.put $ db { ticketSeq = t }
 
 insertEntry :: Entry -> Update Database ()
 insertEntry e = do
-  db@Database{..} <- get
-  put $ db { entries = updateIx (ticket e) e entries }
+  db@Database{..} <- ST.get
+  ST.put $ db { entries = updateIx (ticket e) e entries }
 
 updateEntry :: Entry -> Update Database ()
 updateEntry = insertEntry
 
 getEntry :: Ticket -> Query Database (Maybe Entry)
 getEntry t = do
-  Database{..} <- ask
+  Database{..} <- R.ask
   return . getOne $ entries @= t
 
--------------------------------------------------------------------------------
-{-
-acidQuery :: (QueryEvent event, MethodState event ~ EcomState) => event -> Handler (EventResult event)
-acidQuery q = do
-  state <- getEcomState <$> getYesod
-  query' state q
+getHistory :: Ticket -> Ticket -> Query Database [Entry]
+getHistory fromTicket toTicket = do
+  Database{..} <- R.ask
+  return . toDescList (Proxy :: Proxy Ticket) $ entries @>= fromTicket @<= toTicket
 
-acidUpdate :: (UpdateEvent event, MethodState event ~ EcomState) => event -> Handler (EventResult event)
-acidUpdate q = do
-  state <- getEcomState <$> getYesod
-  update' state q
--}
 -------------------------------------------------------------------------------
 
-makeAcidic ''Database [ 'getDatabase
-                      , 'putDatabase
-                      , 'getTicketSeq
+makeAcidic ''Database [ 'getTicketSeq
                       , 'updateTicketSeq
                       , 'insertEntry
                       , 'updateEntry
                       , 'getEntry
+                      , 'getHistory
                       ]

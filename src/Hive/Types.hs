@@ -7,6 +7,9 @@ module Hive.Types
   , Port
   , Master (..)
   , Ticket (unTicket)
+  , Entry (ticket, problem, solution)
+  , mkEntry
+  , History
   , mkTicket
   , Problem (..)
   , ProblemType (..)  -- reexporting
@@ -29,6 +32,16 @@ newtype Timeout = Timeout { unTimeout :: Int }  deriving (Eq, Show)
 
 type Host = String
 type Port = String
+
+data Entry = Entry { ticket   :: Ticket
+                   , problem  :: Problem
+                   , solution :: Maybe Solution
+                   }
+  deriving (Eq, Ord, Data, Generic, Typeable, Show)
+
+instance Binary Entry where
+
+type History = [Entry]
 
 newtype Master = Master ProcessId deriving (Eq, Generic, Typeable)
 
@@ -58,3 +71,6 @@ hours h = minutes (60 * h)
 
 mkTicket :: Int -> Ticket
 mkTicket = Ticket
+
+mkEntry :: Ticket -> Problem -> Maybe Solution -> Entry
+mkEntry = Entry

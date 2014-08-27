@@ -5,9 +5,10 @@ module Hive.Master.Messaging
 
 -------------------------------------------------------------------------------
 
-import Hive.Types (Master (..), Ticket, Problem, Solution)
-import Hive.Imports.MkBinary
 import Control.Distributed.Process
+
+import Hive.Types (Master (..), Ticket, Problem, Solution, History)
+import Hive.Imports.MkBinary
 
 -------------------------------------------------------------------------------
 
@@ -32,6 +33,12 @@ instance Binary Request where
 data TicketDone = TicketDone ProcessId Ticket Solution deriving (Generic, Typeable)
 instance Binary TicketDone where
 
+data RequestHistory = RequestHistory ProcessId Ticket Ticket deriving (Generic, Typeable)
+instance Binary RequestHistory where
+
+data ReplyHistory = ReplyHistory History deriving (Generic, Typeable)
+instance Binary ReplyHistory where
+
 -------------------------------------------------------------------------------
 
 nodeUp :: Master -> NodeId -> Int -> Process ()
@@ -51,3 +58,13 @@ request (Master master) problem = do
   self <- getSelfPid
   send master (Request self problem)
   expect
+
+requestHistory :: Master -> Ticket -> Ticket -> Process History
+requestHistory (Master master) fromTicket toTicket = do
+  self <- getSelfPid
+  send master (RequestHistory self fromTicket toTicket)
+  ReplyHistory history <- expect
+  return history
+
+replyHistory :: ProcessId -> History -> Process ()
+replyHistory pid history = send pid (ReplyHistory history)

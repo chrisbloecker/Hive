@@ -6,6 +6,7 @@ module Hive.Master
   , findMaster
   , linkMaster
   , request
+  , requestHistory
   , getNode
   , __remoteTable
   ) where
@@ -110,6 +111,11 @@ runMaster = do
                                Just entry -> update' db (UpdateEntry (mkEntry ticket (problem entry) (Just solution)))
                          loop . deregisterJob pid
                               $ state
+
+                     , match $ \(RequestHistory pid ticketFrom ticketTo) -> do
+                         history <- query' db (GetHistory ticketFrom ticketTo)
+                         replyHistory pid history
+                         loop state
 
                      , match $ \(ProcessMonitorNotification _monitorRef process diedReason) -> do
                         say $ "Process died: " ++ show process ++ ", reason: " ++ show diedReason

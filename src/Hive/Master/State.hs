@@ -1,7 +1,20 @@
 {-# LANGUAGE RecordWildCards, DeriveGeneric, DeriveDataTypeable #-}
 
 module Hive.Master.State
-  where
+  ( State (..)
+  , initState
+  , insertNode
+  , removeNode
+  , nodeCount
+  , peakNode
+  , tailNodes
+  , getTicket
+  , setTicket
+  , nextTicket
+  , getMonitor
+  , registerJob
+  , deregisterJob
+  ) where
 
 -------------------------------------------------------------------------------
 
@@ -10,7 +23,7 @@ import Control.Distributed.Process (NodeId, ProcessId, MonitorRef)
 import Data.Map  (Map)
 import Data.Acid (AcidState)
 
-import Hive.Types
+import Hive.Types hiding (Entry(ticket))
 import Hive.Master.Persistent (Database)
 
 import qualified Data.Map as M (empty, lookup, insert, delete)
