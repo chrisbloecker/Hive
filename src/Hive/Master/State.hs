@@ -7,9 +7,11 @@ module Hive.Master.State
 
 import Control.Distributed.Process (NodeId, ProcessId, MonitorRef)
 
-import Data.Map (Map)
+import Data.Map  (Map)
+import Data.Acid (AcidState)
 
 import Hive.Types
+import Hive.Master.Persistent (Database)
 
 import qualified Data.Map as M (empty, lookup, insert, delete)
 
@@ -18,12 +20,13 @@ import qualified Data.Map as M (empty, lookup, insert, delete)
 data State = State { nodes  :: ![NodeId]
                    , ticket :: !Ticket
                    , active :: !(Map ProcessId (Ticket, MonitorRef))
+                   , db     :: !(AcidState Database)
                    }
 
 -------------------------------------------------------------------------------
 
-mkEmptyState :: State
-mkEmptyState = State [] (mkTicket 0) M.empty
+initState :: Ticket -> (AcidState Database) -> State
+initState t db = State [] t M.empty db
 
 insertNode :: NodeId -> State -> State
 insertNode n s@(State {..}) = s { nodes = n:nodes }
@@ -42,6 +45,9 @@ tailNodes s@(State {..}) = s { nodes = tail nodes }
 
 getTicket :: State -> Ticket
 getTicket (State {..}) = ticket
+
+setTicket :: Ticket -> State -> State
+setTicket t s@(State {..}) = s { ticket = t }
 
 nextTicket :: State -> State
 nextTicket s@(State {..}) = s { ticket = mkTicket . (+1) . unTicket $ ticket }

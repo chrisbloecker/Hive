@@ -15,7 +15,8 @@ module Hive.Master
 import Control.Distributed.Process hiding  (closure)
 import Control.Distributed.Process.Closure (remotable, mkClosure)
 
-import Data.Acid (openLocalState)
+import Data.Acid          (openLocalState)
+import Data.Acid.Advanced (query', update')
 
 import Hive.Types
 import Hive.Problem (handle)
@@ -59,56 +60,66 @@ linkMaster (Master master) = link master
 
 runMaster :: Process ()
 runMaster = do
-  self <- getSelfPid
-  db   <- liftIO $ openLocalState initDatabase
+  self       <- getSelfPid
+  db         <- liftIO $ openLocalState initDatabase
+  lastTicket <- query' db GetTicketSeq
   register masterName self
   say $ "Master at " ++ show self
-  loop $ mkEmptyState
+  say $ "Last ticket was " ++ show lastTicket
+  loop (nextTicket $ initState lastTicket db)
     where
       loop :: State -> Process ()
-      loop state = receiveWait [ match $ \(NodeUp node workerCount) -> do
-                                   say $ "Node up: " ++ show node
-                                   _ <- monitorNode node
-                                   let state' = foldr (\_ s -> insertNode node s) state [1..workerCount]
-                                   loop state'
+      loop state@(State {..}) =
+        receiveWait [ match $ \(NodeUp node workerCount) -> do
+                        say $ "Node up: " ++ show node
+                        _ <- monitorNode node
+                        let state' = foldr (\_ s -> insertNode node s) state [1..workerCount]
+                        loop state'
 
-                               , match $ \(ReturnNode node) ->
-                                   loop . insertNode node
-                                        $ state
+                    , match $ \(ReturnNode node) ->
+                        loop . insertNode node
+                             $ state
 
-                               , matchIf (\_ -> nodeCount state > 0) $ \(GetNode asker) -> do
-                                   send asker (ReceiveNode . peakNode $ state)
-                                   loop . tailNodes
-                                        $ state
+                    , matchIf (\_ -> nodeCount state > 0) $ \(GetNode asker) -> do
+                        send asker (ReceiveNode . peakNode $ state)
+                        loop . tailNodes
+                             $ state
 
-                               , match $ \(Request client problem) -> do
-                                   say $ "Request from " ++ show client
-                                   let ticket = getTicket state
-                                   self <- getSelfPid
-                                   (pid, mon) <- flip spawnMonitor ($(mkClosure 'problemHandler) (Master self, ticket, problem)) =<< getSelfNode
-                                   send client ticket
-                                   loop . nextTicket
-                                        . registerJob pid ticket mon
-                                        $ state
+                     , match $ \(Request client problem) -> do
+                         say $ "Request from " ++ show client
+                         let ticket = getTicket state
+                         self <- getSelfPid
+                         (pid, mon) <- flip spawnMonitor ($(mkClosure 'problemHandler) (Master self, ticket, problem)) =<< getSelfNode
+                         send client ticket
+                         update' db (UpdateTicketSeq ticket)
+                         update' db (InsertEntry (mkEntry ticket problem Nothing))
+                         loop . nextTicket
+                              . registerJob pid ticket mon
+                              $ state
 
-                               , match $ \(TicketDone pid ticket solution) -> do
-                                   say $ "Ticket " ++ show ticket ++ " done by process " ++ show pid
-                                   case getMonitor pid state of
-                                     Nothing  -> say $ "Can't find monitor for " ++ show pid
-                                     Just mon -> unmonitor mon
-                                   say $ "Found solution: " ++ show solution
-                                   loop . deregisterJob pid
-                                        $ state
+                     , match $ \(TicketDone pid ticket solution) -> do
+                         say $ "Ticket " ++ show ticket ++ " done by process " ++ show pid
+                         say $ "Found solution: " ++ show solution
+                         case getMonitor pid state of
+                           Nothing  -> say $ "Can't find monitor for " ++ show pid
+                           Just mon -> do
+                             unmonitor mon
+                             mEntry <- query' db (GetEntry ticket)
+                             case mEntry of
+                               Nothing    -> say "Unknown ticket"
+                               Just entry -> update' db (UpdateEntry (mkEntry ticket (problem entry) (Just solution)))
+                         loop . deregisterJob pid
+                              $ state
 
-                               , match $ \(ProcessMonitorNotification _monitorRef process diedReason) -> do
-                                  say $ "Process died: " ++ show process ++ ", reason: " ++ show diedReason
-                                  case diedReason of
-                                    DiedNormal -> say "Nothing to do..."
-                                    _          -> say "Maybe I should do something?"
-                                  loop state
+                     , match $ \(ProcessMonitorNotification _monitorRef process diedReason) -> do
+                        say $ "Process died: " ++ show process ++ ", reason: " ++ show diedReason
+                        case diedReason of
+                          DiedNormal -> say "Nothing to do..."
+                          _          -> say "Maybe I should do something?"
+                        loop state
 
-                               , match $ \(NodeMonitorNotification _monitorRef node diedReason) -> do
-                                   say $ "Node down: " ++ show node ++ ", reason: " ++ show diedReason
-                                   loop . removeNode node
-                                        $ state
-                               ]
+                     , match $ \(NodeMonitorNotification _monitorRef node diedReason) -> do
+                         say $ "Node down: " ++ show node ++ ", reason: " ++ show diedReason
+                         loop . removeNode node
+                              $ state
+                     ]
