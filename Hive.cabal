@@ -47,6 +47,7 @@ library
                        Hive.RemoteTable
                        Hive.Interface
   other-modules:       Hive.Process
+                       Hive.Data.Graph
                        Hive.Master.Messaging
                        Hive.Master.State
                        Hive.Master.Persistent
@@ -54,5 +55,6 @@ library
                        Hive.Problem
                        Hive.Problem.Types
                        Hive.Problem.Arithmetic
+                       Hive.Problem.TSP
   hs-source-dirs:      src
   default-language:    Haskell2010

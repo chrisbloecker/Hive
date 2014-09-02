@@ -4,7 +4,6 @@ module Hive.Interface
   , Problem (Problem)
   , ProblemType (..)
   , Solution (..)
-  , Instance (unInstance)
   , runProcess
   , mkConst
   , mkSimple
@@ -28,5 +27,4 @@ import Hive.Process ( Process
 import Hive.Problem.Types ( Problem (Problem)
                           , ProblemType (..)
                           , Solution (..)
-                          , Instance (unInstance)
                           )

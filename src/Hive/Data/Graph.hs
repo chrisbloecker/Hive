@@ -1,7 +1,7 @@
 {-# LANGUAGE TemplateHaskell, DeriveGeneric, DeriveDataTypeable #-}
 {-# OPTIONS_GHC -fno-warn-type-defaults #-}
 
-module Hive.Problem.Data.Graph
+module Hive.Data.Graph
   ( Graph
   , Path
   , Node
@@ -26,13 +26,8 @@ module Hive.Problem.Data.Graph
 import Data.Text.Lazy.Internal (Text)
 import Data.Text.Lazy.Encoding (encodeUtf8)
 
-import Data.Binary         (Binary, get, put)
-import Data.DeriveTH       (derive, makeBinary)
-import Data.Typeable       (Typeable)
-import GHC.Generics        (Generic)
-
-import Data.Aeson          (FromJSON, decode')
-import Data.Aeson.TH       (deriveJSON, defaultOptions)
+import Hive.Imports.MkBinary
+import Hive.Imports.DeriveJSON
 
 import Data.Foldable       (foldr')
 import Data.List           (unfoldr)
@@ -57,15 +52,11 @@ type Matrix a = IntMap (IntMap a)
 data Graph a = Graph !(Matrix a)
   deriving (Eq, Show, Generic, Typeable)
 
-instance Monoid (Graph a) where
-  mempty = Graph M.empty
-  mappend = undefined
-
 -------------------------------------------------------------------------------
 
 $(derive makeBinary ''Graph)
 
-$(deriveJSON defaultOptions ''Graph)
+$(deriveJSON hiveJSONOptions ''Graph)
 
 -------------------------------------------------------------------------------
 
@@ -73,7 +64,7 @@ $(deriveJSON defaultOptions ''Graph)
 m <+> n = (+) <$> m <*> n
 
 mkEmptyGraph :: Num a => Graph a
-mkEmptyGraph = mempty
+mkEmptyGraph = Graph M.empty
 
 size :: Num a => Graph a -> Size
 size (Graph m) = M.size m

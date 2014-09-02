@@ -2,8 +2,7 @@
 
 module Hive.Problem.Types
   ( ProblemType (..)
-  , Problem (Problem, problemType, inst)
-  , Instance (Instance, unInstance)
+  , Problem (Problem, problemType, problemInstance)
   , Solution (..)
   ) where
 
@@ -22,8 +21,6 @@ data ProblemType  = ARITH -- Arithmetic Expression
                   | SSSP  -- Single Source Shortest Path
   deriving (Eq, Ord, Show, Enum, Bounded, Data, Generic, Typeable)
 
-newtype Instance = Instance { unInstance :: Text } deriving (Eq, Ord, Data, Generic, Typeable, Show)
-
 data Solution = Solution { unSolution :: Text }
               | NoSolution
               | InvalidInput
@@ -31,20 +28,18 @@ data Solution = Solution { unSolution :: Text }
               | NotImplemented
   deriving (Eq, Ord, Data, Generic, Typeable, Show)
 
-data Problem = Problem  { problemType :: ProblemType
-                        , inst        :: Instance
-                        }
+data Problem = Problem { problemType     :: ProblemType
+                       , problemInstance :: Text
+                       }
   deriving (Eq, Ord, Data, Generic, Typeable, Show)
 
 -------------------------------------------------------------------------------
 
 -- for sending it over network
 $(derive makeBinary ''ProblemType)
-$(derive makeBinary ''Instance)
 $(derive makeBinary ''Problem)
 $(derive makeBinary ''Solution)
 
 -- for reading it from JSON
 $(deriveJSON defaultOptions ''ProblemType)
-$(deriveJSON defaultOptions ''Instance)
 $(deriveJSON defaultOptions ''Problem)

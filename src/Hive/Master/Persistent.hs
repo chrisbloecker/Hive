@@ -26,12 +26,11 @@ data Database = Database { ticketSeq :: Ticket
   deriving (Data, Typeable)
 
 $(deriveSafeCopy 0 'base ''Problem)
-deriveSafeCopy 0 'base ''ProblemType
-deriveSafeCopy 0 'base ''Instance
-deriveSafeCopy 0 'base ''Solution
-deriveSafeCopy 0 'base ''Ticket
-deriveSafeCopy 0 'base ''Entry
-deriveSafeCopy 0 'base ''Database
+$(deriveSafeCopy 0 'base ''ProblemType)
+$(deriveSafeCopy 0 'base ''Solution)
+$(deriveSafeCopy 0 'base ''Ticket)
+$(deriveSafeCopy 0 'base ''Entry)
+$(deriveSafeCopy 0 'base ''Database)
 
 -------------------------------------------------------------------------------
 

@@ -39,6 +39,12 @@ instance Binary RequestHistory where
 data ReplyHistory = ReplyHistory History deriving (Generic, Typeable)
 instance Binary ReplyHistory where
 
+data RequestLatestTicket = RequestLatestTicket ProcessId deriving (Generic, Typeable)
+instance Binary RequestLatestTicket where
+
+data ReplyLatestTicket = ReplyLatestTicket Ticket deriving (Generic, Typeable)
+instance Binary ReplyLatestTicket where
+
 -------------------------------------------------------------------------------
 
 nodeUp :: Master -> NodeId -> Int -> Process ()
@@ -68,3 +74,13 @@ requestHistory (Master master) fromTicket toTicket = do
 
 replyHistory :: ProcessId -> History -> Process ()
 replyHistory pid history = send pid (ReplyHistory history)
+
+requestLatestTicket :: Master -> Process Ticket
+requestLatestTicket (Master master) = do
+  self <- getSelfPid
+  send master (RequestLatestTicket self)
+  ReplyLatestTicket ticket <- expect
+  return ticket
+
+replyLatestTicket :: ProcessId -> Ticket -> Process ()
+replyLatestTicket pid ticket = send pid (ReplyLatestTicket ticket)

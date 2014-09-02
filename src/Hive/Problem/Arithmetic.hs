@@ -3,7 +3,6 @@
 module Hive.Problem.Arithmetic
   ( __remoteTable
   , Expr (..)
-  , parse
   , interpret
   ) where
 
@@ -28,10 +27,7 @@ data Expr = Val Int
           | Div Expr Expr
   deriving (Eq, Show, Read)
 
-$(deriveJSON defaultOptions ''Expr)
-
-parse :: String -> Expr
-parse = read
+$(deriveJSON hiveJSONOptions ''Expr)
 
 -------------------------------------------------------------------------------
 

@@ -13,7 +13,6 @@ module Hive.Types
   , mkTicket
   , Problem (..)
   , ProblemType (..)  -- reexporting
-  , Instance (..)
   , Solution (..)
   ) where
 
@@ -28,10 +27,13 @@ import Control.Distributed.Process (ProcessId)
 
 -------------------------------------------------------------------------------
 
-newtype Timeout = Timeout { unTimeout :: Int }  deriving (Eq, Show)
+type Host    = String
+type Port    = String
+type History = [Entry]
 
-type Host = String
-type Port = String
+newtype Timeout = Timeout { unTimeout :: Int }  deriving (Eq, Show)
+newtype Ticket  = Ticket  { unTicket  :: Int }  deriving (Eq, Ord, Data, Generic, Typeable)
+newtype Master  = Master ProcessId deriving (Eq, Generic, Typeable)
 
 data Entry = Entry { ticket   :: Ticket
                    , problem  :: Problem
@@ -39,20 +41,16 @@ data Entry = Entry { ticket   :: Ticket
                    }
   deriving (Eq, Ord, Data, Generic, Typeable, Show)
 
-instance Binary Entry where
-
-type History = [Entry]
-
-newtype Master = Master ProcessId deriving (Eq, Generic, Typeable)
+-------------------------------------------------------------------------------
 
 instance Show Master where
   show (Master pid) = show pid
-instance Binary Master where
-
-newtype Ticket = Ticket { unTicket :: Int } deriving (Eq, Ord, Data, Generic, Typeable)
 
 instance Show Ticket where
   show (Ticket t) = show t
+
+instance Binary Master where
+instance Binary Entry where
 instance Binary Ticket where
 
 -------------------------------------------------------------------------------
