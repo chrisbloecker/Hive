@@ -8,6 +8,8 @@ module Hive.Process
   , mkChoice
   , mkSequence
   , mkParallel
+  , mkMultilel
+  , mkLoop
   ) where
 
 -------------------------------------------------------------------------------
@@ -15,6 +17,7 @@ module Hive.Process
 import Hive.Types            (Master)
 import Hive.Master.Messaging (getNode, returnNode)
 
+import Control.Monad           (forM)
 import Control.Concurrent.MVar (MVar, newEmptyMVar, takeMVar, putMVar)
 
 import Control.Distributed.Process              (liftIO, getSelfPid, call, spawnLocal)
@@ -24,12 +27,26 @@ import qualified Control.Distributed.Process      as CH (Process, Closure, Stati
 
 -------------------------------------------------------------------------------
 
+data Init a where
+  Init :: a -> Init a
+
+data Action a where
+  Action :: (a -> a) -> Action a
+
+data Predicate a where
+  Predicate :: (a -> Bool) -> Predicate a
+
+data LoopHead a where
+  LoopHead :: Init a -> Predicate a -> Action a -> LoopHead a
+
 data Process a b where
   Const    :: (Serializable b) => CH.Static (SerializableDict b) -> CH.Closure (CH.Process b) -> Process a b
   Simple   :: (Serializable b) => CH.Static (SerializableDict b) -> (a -> CH.Closure (CH.Process b)) -> Process a b
   Choice   :: (Serializable b) => (a -> Bool) -> Process a b -> Process a b -> Process a b
   Sequence :: (Serializable b, Serializable c) => Process a c -> Process c b -> Process a b
   Parallel :: (Serializable b) => Process a b -> Process a b -> Process (b, b) b -> Process a b
+  Multilel :: (Serializable b) => [Process a b] -> Process (b, b) b -> Process a b
+  Loop     :: (Serializable b) => LoopHead b -> Process b b -> Process b b
 
 -------------------------------------------------------------------------------
 
@@ -47,6 +64,12 @@ mkSequence = Sequence
 
 mkParallel :: (Serializable b) => Process a b -> Process a b -> Process (b, b) b -> Process a b
 mkParallel = Parallel
+
+mkMultilel :: (Serializable b) => [Process a b] -> Process (b, b) b -> Process a b
+mkMultilel = Multilel
+
+mkLoop :: (Serializable b) => LoopHead b -> Process b b -> Process b b
+mkLoop = Loop
 
 -------------------------------------------------------------------------------
 -- interpretation of Process structure
@@ -78,9 +101,35 @@ runProcess master (Parallel p1 p2 combinator) x = do
   r1 <- liftIO $ takeMVar mvar
   runProcess master combinator (r1, r2)
 
+runProcess master (Multilel ps combinator) x = do
+  mvars <- forM ps $ \_ -> liftIO newEmptyMVar
+  mapM_ (\(proc,mvar) -> spawnLocal $ runProcessHelper master proc x mvar) (ps `zip` mvars)
+  ress  <- forM mvars $ \m -> (liftIO . takeMVar $ m)
+  combine master ress combinator
+
+runProcess master (Loop (LoopHead (Init i) (Predicate pr) (Action a)) p) x =
+  if pr i then do
+    runProcess master (Loop (LoopHead (Init (a i)) (Predicate pr) (Action a)) p) =<< runProcess master p x
+  else
+    return x
+
 -------------------------------------------------------------------------------
 
 runProcessHelper :: Master -> Process a b -> a -> MVar b -> CH.Process ()
 runProcessHelper master p x mvar = do
   r <- runProcess master p x
   liftIO $ putMVar mvar r
+
+combine :: Master -> [a] -> Process (a,a) a -> CH.Process a
+combine _ (r:[]) p = return r
+
+combine master rs p = do
+  let pairs = toPairs rs
+  mvars <- forM pairs $ \_ -> liftIO newEmptyMVar
+  mapM_ (\(pair, mvar) -> spawnLocal $ runProcessHelper master p pair mvar) (pairs `zip` mvars)
+  ress <- forM mvars $ \m -> (liftIO . takeMVar $ m)
+  combine master ress p
+
+toPairs       [] = []
+toPairs (x:y:es) = (x,y):toPairs es
+toPairs (  x:[]) = [(x,x)]

@@ -9,7 +9,7 @@ module Hive.Problem.TSP.Pheromones
 
 import Data.Foldable (foldr')
 
-import Hive.Problem.Data.Graph (Graph, Path, mkEmptyGraph, size, addEdge, distance', overlay)
+import Hive.Data.Graph (Graph, Path, mkEmptyGraph, size, addEdge, distance', overlay)
 
 -------------------------------------------------------------------------------
 
