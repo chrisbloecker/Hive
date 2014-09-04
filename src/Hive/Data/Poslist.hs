@@ -1,24 +1,19 @@
 {-# LANGUAGE TemplateHaskell, DeriveGeneric, DeriveDataTypeable #-}
 
-module Hive.Problem.Data.External.PosList
+module Hive.Data.Poslist
   ( parse
   , convertToGraph
   ) where
 
-import GHC.Generics        (Generic)
-import Data.Binary         (Binary, get, put)
-import Data.Typeable       (Typeable)
-import Data.DeriveTH       (derive, makeBinary)
+import Hive.Imports.MkBinary
+import Hive.Imports.DeriveJSON
 
-import Data.Aeson          (decode')
-import Data.Aeson.TH       (deriveJSON, defaultOptions)
-
-import Data.Foldable       (foldr')
+import Data.Foldable           (foldr')
 
 import Data.Text.Lazy.Internal (Text)
 import Data.Text.Lazy.Encoding (encodeUtf8)
 
-import Hive.Problem.Data.Graph (Graph, mkEmptyGraph, addEdge)
+import Hive.Data.Graph (Graph, mkEmptyGraph, addEdge)
 
 -------------------------------------------------------------------------------
 
@@ -32,7 +27,7 @@ data PosList  = PosList [Pos]          deriving (Show, Generic, Typeable)
 
 $(derive makeBinary ''PosList)
 
-$(deriveJSON defaultOptions ''PosList)
+$(deriveJSON hiveJSONOptions ''PosList)
 
 -------------------------------------------------------------------------------
 

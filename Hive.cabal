@@ -48,6 +48,7 @@ library
                        Hive.Interface
   other-modules:       Hive.Process
                        Hive.Data.Graph
+                       Hive.Data.Poslist
                        Hive.Master.Messaging
                        Hive.Master.State
                        Hive.Master.Persistent

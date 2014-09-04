@@ -18,6 +18,7 @@ import GHC.Generics     (Generic)
 
 data ProblemType  = ARITH -- Arithmetic Expression
                   | TSP   -- Traveling Salesman Problem
+                  | TSPL  -- the same with Poslist
                   | SSSP  -- Single Source Shortest Path
   deriving (Eq, Ord, Show, Enum, Bounded, Data, Generic, Typeable)
 

@@ -53,7 +53,6 @@ mkConfiguration = Configuration
 
 ant :: (Configuration, Pheromones) -> CH.Process Path
 ant (Configuration {..}, pheromones) = do
-  say "Let's run the ant"
   runAnt graph pheromones [1] (nodes graph \\ [1])
   where
     runAnt :: Graph Int -> Pheromones -> Visited -> Unvisited -> CH.Process Path

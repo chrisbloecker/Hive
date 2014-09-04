@@ -6,11 +6,12 @@ module Hive.Problem
 
 import Hive.Interface
 import Hive.Data.Graph
+import Hive.Data.Poslist
 import Hive.Problem.TSP.Pheromones
 
-import Data.Aeson              (decode')
+import Data.Aeson              (decode', encode)
 import Data.Text.Lazy          (pack)
-import Data.Text.Lazy.Encoding (encodeUtf8)
+import Data.Text.Lazy.Encoding (encodeUtf8, decodeUtf8)
 
 import qualified Control.Distributed.Process as CH
 import qualified Hive.Problem.Arithmetic as Arithmetic
@@ -29,17 +30,21 @@ handle (Problem ARITH inst) master = do
       return . Solution . pack . show $ solution
 
 handle (Problem TSP inst) master = do
-  let mGraph = decode' . encodeUtf8 $ inst :: Maybe (Graph Int)
+  let mGraph = Hive.Data.Graph.parse inst
   case mGraph of
     Nothing -> return InvalidInput
     Just graph -> do
-      CH.say "I can read this graph!"
       let configuration = TSP.mkConfiguration graph 10 (size graph) 3 5
-      CH.say "And I have a configuration"
       let proc = TSP.interpret configuration
-      CH.say "Process created... let's run it"
       solution <- runProcess master proc (configuration, mkPheromones graph 1.0)
-      CH.say $ "There it is... my solution: " ++ show solution
       return . Solution . pack . show $ solution
+
+handle (Problem TSPL inst) master = do
+  let mPoslist = Hive.Data.Poslist.parse inst
+  case mPoslist of
+    Nothing -> return InvalidInput
+    Just poslist -> do
+      let graph = convertToGraph poslist
+      handle (Problem TSP (decodeUtf8 . encode $ graph)) master
 
 handle (Problem _ _) _master = return NotImplemented
