@@ -8,7 +8,7 @@ module Hive.Problem.TSP
 
 -------------------------------------------------------------------------------
 
-import Control.Distributed.Process              (liftIO)
+import Control.Distributed.Process              (liftIO, say)
 import Control.Distributed.Process.Closure      (mkClosure, mkStatic, remotable)
 import Control.Distributed.Process.Serializable (SerializableDict(SerializableDict))
 
@@ -30,8 +30,6 @@ data Configuration = Configuration { graph      :: Graph Int
                                    , iterations :: Iterations
                                    , alpha      :: Alpha
                                    , beta       :: Beta
-                                   , tau        :: Tau
-                                   , eta        :: Eta
                                    }
   deriving (Generic, Typeable)
 
@@ -41,66 +39,52 @@ type Ants       = Int
 type Iterations = Int
 type Alpha      = Double
 type Beta       = Double
-type Tau        = Double
-type Eta        = Double
 type Visited    = [Node]
 type Unvisited  = [Node]
 
+type Result     = (Path, Pheromones)
+
 -------------------------------------------------------------------------------
 
-mkConfiguration :: Graph Int -> Ants -> Iterations -> Alpha -> Beta -> Tau -> Eta -> Configuration
+mkConfiguration :: Graph Int -> Ants -> Iterations -> Alpha -> Beta -> Configuration
 mkConfiguration = Configuration
 
 -------------------------------------------------------------------------------
 
 ant :: (Configuration, Pheromones) -> CH.Process Path
-ant (Configuration {..}, pheromones) = runAnt graph pheromones [1] (nodes graph \\ [1])
+ant (Configuration {..}, pheromones) = do
+  say "Let's run the ant"
+  runAnt graph pheromones [1] (nodes graph \\ [1])
   where
     runAnt :: Graph Int -> Pheromones -> Visited -> Unvisited -> CH.Process Path
     runAnt _ _ visited        [] = return visited
     runAnt g p visited unvisited = do
-      let alpha    = 3
-      let beta     = 5
-      let tau      = distance' p (last visited)
-      let eta      = (1.0/) . fromIntegral . distance' g (last visited)
-      let probs    = [tau u**alpha * eta u**beta | u <- unvisited]
+      let tau   = distance' p (last visited)
+      let eta   = (1.0/) . fromIntegral . distance' g (last visited)
+      let probs = [tau u**alpha * eta u**beta | u <- unvisited]
       rand <- liftIO $ randomRIO (0, sum probs)
       let next  = fst . head . dropWhile ((< rand) . snd) $ zip unvisited (scanl1 (+) probs)
       runAnt g p (visited ++ [next]) (unvisited \\ [next])
 
-cycle :: Configuration -> CH.Process Path
-cycle = undefined {-let initialSolution = nodes g
-  loop $ WarriorS g (mkPheromones g 1.0) (initialSolution, pathLength' g initialSolution) 0
-    where
-      loop :: WarriorS -> Process ()
-      loop state@(WarriorS {..}) =
-        if iteration < iterations then do
-          self <- getSelfPid
-          let task = Task ($(mkClosure 'ant) (self :: Warrior, graph, pheromones))
-          forM_ [1 .. (size graph)] $ \_ -> send scheduler $ WTaskS self task
-          candidates <- mapM (\_ -> do { Candidate trip <- expect; return trip }) [1 .. (size graph)]
-          loop state { pheromones = depositPheromones candidates . evaporation 0.1 $ pheromones
-                     , solution   = minimumBy (compare `on` snd) (solution : candidates)
-                     , iteration  = iteration + 1 }
-        else
-            send client $ SSolutionC $ Solution (pack . show . fst $ solution) (snd solution)
--}
+combineResults :: (Graph Int, Result, Result) -> CH.Process Result
+combineResults (g, (pa1, ph1), (pa2, ph2)) = return (shorterPath g pa1 pa2, overlay (+) ph1 ph2)
+
 pathDict :: SerializableDict Path
 pathDict = SerializableDict
 
+resultDict :: SerializableDict Result
+resultDict = SerializableDict
+
 -------------------------------------------------------------------------------
 
-remotable ['ant, 'cycle, 'pathDict]
+remotable ['ant, 'combineResults, 'pathDict, 'resultDict]
 
 -------------------------------------------------------------------------------
 
 antProcess :: Process (Configuration, Pheromones) Path
 antProcess = mkSimple $(mkStatic 'pathDict) $(mkClosure 'ant)
 
-cycleProcess :: Process Configuration Path
-cycleProcess = mkSimple $(mkStatic 'pathDict) $(mkClosure 'cycle)
-
 -------------------------------------------------------------------------------
 
-interpret :: Configuration -> Process (Graph Int) Path
-interpret = undefined
+interpret :: Configuration -> Process (Configuration, Pheromones) Path
+interpret _ = antProcess

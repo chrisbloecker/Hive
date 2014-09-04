@@ -10,6 +10,12 @@ module Hive.Interface
   , mkChoice
   , mkSequence
   , mkParallel
+  , mkMultilel
+  , mkLoop
+  , mkInit
+  , mkAction
+  , mkPredicate
+  , mkLoopHead
   ) where
 
 import Hive.Types ( Master
@@ -22,6 +28,12 @@ import Hive.Process ( Process
                     , mkChoice
                     , mkSequence
                     , mkParallel
+                    , mkMultilel
+                    , mkLoop
+                    , mkInit
+                    , mkAction
+                    , mkPredicate
+                    , mkLoopHead
                     )
 
 import Hive.Problem.Types ( Problem (Problem)

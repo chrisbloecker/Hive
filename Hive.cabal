@@ -52,9 +52,12 @@ library
                        Hive.Master.State
                        Hive.Master.Persistent
                        Hive.NetworkUtils
+                       Hive.Imports.DeriveJSON
+                       Hive.Imports.MkBinary
                        Hive.Problem
                        Hive.Problem.Types
                        Hive.Problem.Arithmetic
                        Hive.Problem.TSP
+                       Hive.Problem.TSP.Pheromones
   hs-source-dirs:      src
   default-language:    Haskell2010

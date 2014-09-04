@@ -10,6 +10,10 @@ module Hive.Process
   , mkParallel
   , mkMultilel
   , mkLoop
+  , mkInit
+  , mkAction
+  , mkPredicate
+  , mkLoopHead
   ) where
 
 -------------------------------------------------------------------------------
@@ -70,6 +74,18 @@ mkMultilel = Multilel
 
 mkLoop :: (Serializable b) => LoopHead b -> Process b b -> Process b b
 mkLoop = Loop
+
+mkInit :: a -> Init a
+mkInit = Init
+
+mkAction :: (a -> a) -> Action a
+mkAction = Action
+
+mkPredicate :: (a -> Bool) -> Predicate a
+mkPredicate = Predicate
+
+mkLoopHead :: Init a -> Predicate a -> Action a -> LoopHead a
+mkLoopHead = LoopHead
 
 -------------------------------------------------------------------------------
 -- interpretation of Process structure
