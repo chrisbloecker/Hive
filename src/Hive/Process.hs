@@ -10,10 +10,7 @@ module Hive.Process
   , mkParallel
   , mkMultilel
   , mkLoop
-  , mkInit
-  , mkAction
-  , mkPredicate
-  , mkLoopHead
+  , mkSimpleLoop
   ) where
 
 -------------------------------------------------------------------------------
@@ -31,18 +28,6 @@ import qualified Control.Distributed.Process      as CH (Process, Closure, Stati
 
 -------------------------------------------------------------------------------
 
-data Init a where
-  Init :: a -> Init a
-
-data Action a where
-  Action :: (a -> a) -> Action a
-
-data Predicate a where
-  Predicate :: (a -> Bool) -> Predicate a
-
-data LoopHead a where
-  LoopHead :: Init a -> Predicate a -> Action a -> LoopHead a
-
 data Process a b where
   Const    :: (Serializable b) => CH.Static (SerializableDict b) -> CH.Closure (CH.Process b) -> Process a b
   Simple   :: (Serializable b) => CH.Static (SerializableDict b) -> (a -> CH.Closure (CH.Process b)) -> Process a b
@@ -50,7 +35,7 @@ data Process a b where
   Sequence :: (Serializable b, Serializable c) => Process a c -> Process c b -> Process a b
   Parallel :: (Serializable b) => Process a b -> Process a b -> Process (b, b) b -> Process a b
   Multilel :: (Serializable b) => [Process a b] -> Process (b, b) b -> Process a b
-  Loop     :: (Serializable b) => LoopHead b -> Process b b -> Process b b
+  Loop     :: (Serializable b) => b -> c -> (c -> Bool) -> (b -> a) -> (a -> c -> c) -> Process a b -> Process a b
 
 -------------------------------------------------------------------------------
 
@@ -72,20 +57,11 @@ mkParallel = Parallel
 mkMultilel :: (Serializable b) => [Process a b] -> Process (b, b) b -> Process a b
 mkMultilel = Multilel
 
-mkLoop :: (Serializable b) => LoopHead b -> Process b b -> Process b b
+mkLoop :: (Serializable b) => b -> c -> (c -> Bool) -> (b -> a) -> (a -> c -> c) -> Process a b -> Process a b
 mkLoop = Loop
 
-mkInit :: a -> Init a
-mkInit = Init
-
-mkAction :: (a -> a) -> Action a
-mkAction = Action
-
-mkPredicate :: (a -> Bool) -> Predicate a
-mkPredicate = Predicate
-
-mkLoopHead :: Init a -> Predicate a -> Action a -> LoopHead a
-mkLoopHead = LoopHead
+mkSimpleLoop :: (Serializable b) => b -> (a -> Bool) -> (b -> a) -> Process a b -> Process a b
+mkSimpleLoop ib pr ba p = Loop ib undefined pr ba (\x _ -> x) p
 
 -------------------------------------------------------------------------------
 -- interpretation of Process structure
@@ -123,11 +99,12 @@ runProcess master (Multilel ps combinator) x = do
   ress  <- forM mvars $ \m -> (liftIO . takeMVar $ m)
   combine master ress combinator
 
-runProcess master (Loop (LoopHead (Init i) (Predicate pr) (Action a)) p) x =
-  if pr i then do
-    runProcess master (Loop (LoopHead (Init (a i)) (Predicate pr) (Action a)) p) =<< runProcess master p x
+runProcess master (Loop ib ic pr ba acc p) x =
+  if pr (acc x ic) then do
+    x' <- runProcess master p x
+    runProcess master (Loop x' (acc x ic) pr ba acc p) (ba x')
   else
-    return x
+    return ib
 
 -------------------------------------------------------------------------------
 
@@ -146,6 +123,6 @@ combine master rs p = do
   ress <- forM mvars $ \m -> (liftIO . takeMVar $ m)
   combine master ress p
 
-toPairs       [] = []
+toPairs      []  = []
 toPairs (x:y:es) = (x,y):toPairs es
 toPairs (  x:[]) = [(x,x)]
