@@ -34,7 +34,7 @@ data Process a b where
   Choice   :: (Serializable b) => (a -> Bool) -> Process a b -> Process a b -> Process a b
   Sequence :: (Serializable b, Serializable c) => Process a c -> Process c b -> Process a b
   Parallel :: (Serializable b) => Process a b -> Process a b -> Process (b, b) b -> Process a b
-  Multilel :: (Serializable b) => [Process a b] -> Process (b, b) b -> Process a b
+  Multilel :: (Serializable b, Serializable c) => [Process a c] -> b -> Process (b, [c]) b -> Process a b
   Loop     :: (Serializable b) => b -> c -> (c -> Bool) -> (b -> a) -> (a -> c -> c) -> Process a b -> Process a b
 
 -------------------------------------------------------------------------------
@@ -54,25 +54,22 @@ mkSequence = Sequence
 mkParallel :: (Serializable b) => Process a b -> Process a b -> Process (b, b) b -> Process a b
 mkParallel = Parallel
 
-mkMultilel :: (Serializable b) => [Process a b] -> Process (b, b) b -> Process a b
+mkMultilel :: (Serializable b, Serializable c) => [Process a c] -> b -> Process (b, [c]) b -> Process a b
 mkMultilel = Multilel
 
 mkLoop :: (Serializable b) => b -> c -> (c -> Bool) -> (b -> a) -> (a -> c -> c) -> Process a b -> Process a b
 mkLoop = Loop
 
 mkSimpleLoop :: (Serializable b) => b -> (a -> Bool) -> (b -> a) -> Process a b -> Process a b
-mkSimpleLoop ib pr ba p = Loop ib undefined pr ba (\x _ -> x) p
+mkSimpleLoop ib pr ba p = Loop ib undefined pr ba const p
 
 -------------------------------------------------------------------------------
 -- interpretation of Process structure
 -------------------------------------------------------------------------------
 
 runProcess :: Master -> Process a b -> a -> CH.Process b
-runProcess master (Const sDict closure) _ = do
-  node <- getNode master =<< getSelfPid
-  res  <- call sDict node closure
-  returnNode master node
-  return res
+runProcess master (Const sDict closure) x =
+  runProcess master (Simple sDict (const closure)) x
 
 runProcess master (Simple sDict closureGen) x = do
   node <- getNode master =<< getSelfPid
@@ -93,11 +90,16 @@ runProcess master (Parallel p1 p2 combinator) x = do
   r1 <- liftIO $ takeMVar mvar
   runProcess master combinator (r1, r2)
 
-runProcess master (Multilel ps combinator) x = do
+{-
+runProcess master (Parallel p1 p2 combinator) x =
+  runProcess master (Multilel [p1, p2] (Sequence undefined combinator)) x
+-}
+
+runProcess master (Multilel ps ib fold) x = do
   mvars <- forM ps $ \_ -> liftIO newEmptyMVar
   mapM_ (\(proc,mvar) -> spawnLocal $ runProcessHelper master proc x mvar) (ps `zip` mvars)
   ress  <- forM mvars $ \m -> (liftIO . takeMVar $ m)
-  combine master ress combinator
+  runProcess master fold (ib, ress)
 
 runProcess master (Loop ib ic pr ba acc p) x =
   if pr (acc x ic) then do
@@ -113,16 +115,18 @@ runProcessHelper master p x mvar = do
   r <- runProcess master p x
   liftIO $ putMVar mvar r
 
-combine :: Master -> [a] -> Process (a,a) a -> CH.Process a
+{-
+combine :: Master -> Process (b, [c]) b -> [c] -> CH.Process b
 combine _ (r:[]) p = return r
 
 combine master rs p = do
-  let pairs = toPairs rs
-  mvars <- forM pairs $ \_ -> liftIO newEmptyMVar
-  mapM_ (\(pair, mvar) -> spawnLocal $ runProcessHelper master p pair mvar) (pairs `zip` mvars)
+  let chunks = split 2 rs
+  mvars <- forM chunks $ \_ -> liftIO newEmptyMVar
+  mapM_ (\(chunk, mvar) -> spawnLocal $ runProcessHelper master p chunk mvar) (chunks `zip` mvars)
   ress <- forM mvars $ \m -> (liftIO . takeMVar $ m)
   combine master ress p
+-}
 
-toPairs      []  = []
-toPairs (x:y:es) = (x,y):toPairs es
-toPairs (  x:[]) = [(x,x)]
+split :: Int -> [a] -> [[a]]
+split _ [] = []
+split i  l = take i l : split i (drop i l)
