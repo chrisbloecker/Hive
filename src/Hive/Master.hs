@@ -86,7 +86,7 @@ runMaster = do
                         send asker (ReceiveNode . peakNode $ state)
                         loop . tailNodes
                              $ state
-
+                             
                      , match $ \(Request client problem) -> do
                          say $ "Request from " ++ show client
                          let ticket = getTicket state

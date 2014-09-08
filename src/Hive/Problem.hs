@@ -34,9 +34,9 @@ handle (Problem TSP inst) master = do
   case mGraph of
     Nothing -> return InvalidInput
     Just graph -> do
-      let configuration = TSP.mkConfiguration graph 10 (size graph) 3 5
+      let configuration = TSP.mkConfiguration graph (mkPheromones graph 2) (nodes graph) 10 (size graph) 3 5
       let proc = TSP.interpret configuration
-      solution <- runProcess master proc (configuration, mkPheromones graph 1.0)
+      solution <- runProcess master proc configuration
       return . Solution . pack . show $ solution
 
 handle (Problem TSPL inst) master = do
