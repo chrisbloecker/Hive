@@ -7,6 +7,8 @@ module Hive.Master.Messaging
 
 import Control.Distributed.Process
 
+import Control.Applicative ((<$>))
+
 import Hive.Types (Master (..), Ticket, Problem, Solution, History)
 import Hive.Imports.MkBinary
 
@@ -45,6 +47,9 @@ instance Binary RequestLatestTicket where
 data ReplyLatestTicket = ReplyLatestTicket Ticket deriving (Generic, Typeable)
 instance Binary ReplyLatestTicket where
 
+data Terminate = Terminate deriving (Generic, Typeable)
+instance Binary Terminate where
+
 -------------------------------------------------------------------------------
 
 nodeUp :: Master -> NodeId -> Int -> Process ()
@@ -55,6 +60,27 @@ getNode (Master master) asker = do
   send master (GetNode asker)
   ReceiveNode nodeId <- expect
   return nodeId
+
+getFakeMaster :: ProcessId -> Process Master
+getFakeMaster pid = return . Master =<< spawnLocal (fakeMaster pid)
+  where
+    fakeMaster :: ProcessId -> Process ()
+    fakeMaster pid = do
+      link pid
+      listen
+
+    listen :: Process ()
+    listen = receiveWait [ match $ \(GetNode asker) -> do
+                             self <- processNodeId <$> getSelfPid
+                             send asker (ReceiveNode self)
+                             listen
+
+                         , match $ \Terminate ->
+                             return ()
+                         ]
+
+terminateMaster :: ProcessId -> Process ()
+terminateMaster pid = send pid Terminate
 
 returnNode :: Master -> NodeId -> Process ()
 returnNode (Master master) node = send master (ReturnNode node)

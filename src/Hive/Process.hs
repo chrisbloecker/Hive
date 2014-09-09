@@ -5,6 +5,7 @@ module Hive.Process
   , runProcess
   , mkConst
   , mkSimple
+  , mkLocal
   , mkChoice
   , mkSequence
   , mkParallel
@@ -16,7 +17,7 @@ module Hive.Process
 -------------------------------------------------------------------------------
 
 import Hive.Types            (Master)
-import Hive.Master.Messaging (getNode, returnNode)
+import Hive.Master.Messaging (getNode, returnNode, getFakeMaster, terminateMaster)
 
 import Control.Monad           (forM)
 import Control.Concurrent.MVar (MVar, newEmptyMVar, takeMVar, putMVar)
@@ -31,6 +32,7 @@ import qualified Control.Distributed.Process      as CH (Process, Closure, Stati
 data Process a b where
   Const    :: (Serializable b) => CH.Static (SerializableDict b) -> CH.Closure (CH.Process b) -> Process a b
   Simple   :: (Serializable b) => CH.Static (SerializableDict b) -> (a -> CH.Closure (CH.Process b)) -> Process a b
+  Local    :: (Serializable b) => Process a b -> Process a b
   Choice   :: (Serializable b) => (a -> Bool) -> Process a b -> Process a b -> Process a b
   Sequence :: (Serializable b, Serializable c) => Process a c -> Process c b -> Process a b
   Parallel :: (Serializable b) => Process a b -> Process a b -> Process (b, b) b -> Process a b
@@ -44,6 +46,9 @@ mkConst = Const
 
 mkSimple :: (Serializable b) => CH.Static (SerializableDict b) -> (a -> CH.Closure (CH.Process b)) -> Process a b
 mkSimple = Simple
+
+mkLocal :: (Serializable b) => Process a b -> Process a b
+mkLocal = Local
 
 mkChoice :: (Serializable b) => (a -> Bool) -> Process a b -> Process a b -> Process a b
 mkChoice = Choice
@@ -77,6 +82,10 @@ runProcess master (Simple sDict closureGen) x = do
   returnNode master node
   return res
 
+runProcess master (Local p) x = do
+  fakeMaster <- getFakeMaster =<< getSelfPid
+  runProcess fakeMaster p x
+
 runProcess master (Choice p p1 p2) x =
   runProcess master (if p x then p1 else p2) x
 
@@ -89,11 +98,6 @@ runProcess master (Parallel p1 p2 combinator) x = do
   r2 <- runProcess master p2 x
   r1 <- liftIO $ takeMVar mvar
   runProcess master combinator (r1, r2)
-
-{-
-runProcess master (Parallel p1 p2 combinator) x =
-  runProcess master (Multilel [p1, p2] (Sequence undefined combinator)) x
--}
 
 runProcess master (Multilel ps ib fold) x = do
   mvars <- forM ps $ \_ -> liftIO newEmptyMVar
@@ -114,18 +118,6 @@ runProcessHelper :: Master -> Process a b -> a -> MVar b -> CH.Process ()
 runProcessHelper master p x mvar = do
   r <- runProcess master p x
   liftIO $ putMVar mvar r
-
-{-
-combine :: Master -> Process (b, [c]) b -> [c] -> CH.Process b
-combine _ (r:[]) p = return r
-
-combine master rs p = do
-  let chunks = split 2 rs
-  mvars <- forM chunks $ \_ -> liftIO newEmptyMVar
-  mapM_ (\(chunk, mvar) -> spawnLocal $ runProcessHelper master p chunk mvar) (chunks `zip` mvars)
-  ress <- forM mvars $ \m -> (liftIO . takeMVar $ m)
-  combine master ress p
--}
 
 split :: Int -> [a] -> [[a]]
 split _ [] = []

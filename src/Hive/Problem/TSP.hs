@@ -29,8 +29,8 @@ import qualified Control.Distributed.Process as CH (Process)
 -------------------------------------------------------------------------------
 
 data Configuration = Configuration { graph      :: Graph Int
-                                   , pheromones :: Pheromones
-                                   , path       :: Path
+                                   , pheromones :: !Pheromones
+                                   , path       :: !Path
                                    , ants       :: Ants
                                    , iterations :: Iterations
                                    , alpha      :: Alpha
@@ -106,6 +106,6 @@ extractSolutionProcess = mkSimple $(mkStatic 'pathDict) $(mkClosure 'extractSolu
 
 interpret :: Configuration -> Process Configuration Path
 interpret conf@(Configuration {..}) = do
-  let innerProc = mkMultilel (take ants . repeat $ antProcess) conf combinePathsProcess
+  let innerProc = mkMultilel (take ants . repeat $ antProcess) conf (mkLocal combinePathsProcess)
   let loop      = mkLoop conf 0 (<iterations) id (\_ i -> i+1) innerProc
   mkSequence loop extractSolutionProcess

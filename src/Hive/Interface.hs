@@ -7,6 +7,7 @@ module Hive.Interface
   , runProcess
   , mkConst
   , mkSimple
+  , mkLocal
   , mkChoice
   , mkSequence
   , mkParallel
@@ -22,6 +23,7 @@ import Hive.Process ( Process
                     , runProcess
                     , mkConst
                     , mkSimple
+                    , mkLocal
                     , mkChoice
                     , mkSequence
                     , mkParallel
