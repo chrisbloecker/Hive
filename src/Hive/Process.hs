@@ -84,7 +84,9 @@ runProcess master (Simple sDict closureGen) x = do
 
 runProcess master (Local p) x = do
   fakeMaster <- getFakeMaster =<< getSelfPid
-  runProcess fakeMaster p x
+  res <- runProcess fakeMaster p x
+  terminateMaster fakeMaster
+  return res
 
 runProcess master (Choice p p1 p2) x =
   runProcess master (if p x then p1 else p2) x

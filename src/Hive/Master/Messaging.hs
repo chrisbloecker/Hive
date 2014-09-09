@@ -79,8 +79,8 @@ getFakeMaster pid = return . Master =<< spawnLocal (fakeMaster pid)
                              return ()
                          ]
 
-terminateMaster :: ProcessId -> Process ()
-terminateMaster pid = send pid Terminate
+terminateMaster :: Master -> Process ()
+terminateMaster (Master master) = send master Terminate
 
 returnNode :: Master -> NodeId -> Process ()
 returnNode (Master master) node = send master (ReturnNode node)
