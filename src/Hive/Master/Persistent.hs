@@ -29,6 +29,7 @@ $(deriveSafeCopy 0 'base ''Problem)
 $(deriveSafeCopy 0 'base ''ProblemType)
 $(deriveSafeCopy 0 'base ''Solution)
 $(deriveSafeCopy 0 'base ''Ticket)
+$(deriveSafeCopy 0 'base ''Time)
 $(deriveSafeCopy 0 'base ''Entry)
 $(deriveSafeCopy 0 'base ''Database)
 
@@ -38,9 +39,11 @@ instance Indexable Ticket where
   empty = ixSet [ ixFun $ \t -> [unTicket t] ]
 
 instance Indexable Entry where
-  empty = ixSet [ ixFun $ \e -> [ticket   e]
-                , ixFun $ \e -> [problem  e]
-                , ixFun $ \e -> [solution e]
+  empty = ixSet [ ixFun $ \e -> [ticket    e]
+                , ixFun $ \e -> [problem   e]
+                , ixFun $ \e -> [solution  e]
+                , ixFun $ \e -> [startTime e]
+                , ixFun $ \e -> [endTime   e]
                 ]
 
 -------------------------------------------------------------------------------

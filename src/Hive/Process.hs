@@ -33,7 +33,7 @@ data Process a b where
   Const    :: (Serializable b) => CH.Static (SerializableDict b) -> CH.Closure (CH.Process b) -> Process a b
   Simple   :: (Serializable b) => CH.Static (SerializableDict b) -> (a -> CH.Closure (CH.Process b)) -> Process a b
   Local    :: (Serializable b) => Process a b -> Process a b
-  Choice   :: (Serializable b) => (a -> Bool) -> Process a b -> Process a b -> Process a b
+  Choice   :: (Serializable b) => c -> (a -> c -> c) -> (c -> Bool) -> Process a b -> Process a b -> Process a b
   Sequence :: (Serializable b, Serializable c) => Process a c -> Process c b -> Process a b
   Parallel :: (Serializable b) => Process a b -> Process a b -> Process (b, b) b -> Process a b
   Multilel :: (Serializable b, Serializable c) => [Process a c] -> b -> Process (b, [c]) b -> Process a b
@@ -50,7 +50,7 @@ mkSimple = Simple
 mkLocal :: (Serializable b) => Process a b -> Process a b
 mkLocal = Local
 
-mkChoice :: (Serializable b) => (a -> Bool) -> Process a b -> Process a b -> Process a b
+mkChoice :: (Serializable b) => c -> (a -> c -> c) -> (c -> Bool) -> Process a b -> Process a b -> Process a b
 mkChoice = Choice
 
 mkSequence :: (Serializable b, Serializable c) => Process a c -> Process c b -> Process a b
@@ -88,8 +88,8 @@ runProcess master (Local p) x = do
   terminateMaster fakeMaster
   return res
 
-runProcess master (Choice p p1 p2) x =
-  runProcess master (if p x then p1 else p2) x
+runProcess master (Choice c acc p p1 p2) x =
+  runProcess master (if p (acc x c) then p1 else p2) x
 
 runProcess master (Sequence p1 p2) x =
   runProcess master p1 x >>= runProcess master p2

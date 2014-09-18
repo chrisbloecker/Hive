@@ -17,8 +17,12 @@ module Hive.Master
 import Control.Distributed.Process hiding  (closure)
 import Control.Distributed.Process.Closure (remotable, mkClosure)
 
+import Control.Applicative ((<$>))
+
 import Data.Acid          (openLocalState)
 import Data.Acid.Advanced (query', update')
+
+import Data.Time.Clock
 
 import Hive.Types
 import Hive.Problem (handle)
@@ -93,8 +97,9 @@ runMaster = do
                          self <- getSelfPid
                          (pid, mon) <- flip spawnMonitor ($(mkClosure 'problemHandler) (Master self, ticket, problem)) =<< getSelfNode
                          send client ticket
+                         now <- liftIO getCurrentTime
                          update' db (UpdateTicketSeq ticket)
-                         update' db (InsertEntry (mkEntry ticket problem Nothing))
+                         update' db (InsertEntry (mkEntry ticket problem Nothing (mkTime now) Nothing))
                          loop . nextTicket
                               . registerJob pid ticket mon
                               $ state
@@ -109,7 +114,9 @@ runMaster = do
                              mEntry <- query' db (GetEntry ticket)
                              case mEntry of
                                Nothing    -> say "Unknown ticket"
-                               Just entry -> update' db (UpdateEntry (mkEntry ticket (problem entry) (Just solution)))
+                               Just entry -> do
+                                 now <- liftIO getCurrentTime
+                                 update' db (UpdateEntry (mkEntry ticket (problem entry) (Just solution) (startTime entry) (Just . mkTime $ now)))
                          loop . deregisterJob pid
                               $ state
 

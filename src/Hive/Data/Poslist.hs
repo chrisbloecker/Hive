@@ -1,7 +1,8 @@
 {-# LANGUAGE TemplateHaskell, DeriveGeneric, DeriveDataTypeable #-}
 
 module Hive.Data.Poslist
-  ( parse
+  ( Poslist
+  , parse
   , convertToGraph
   ) where
 
@@ -21,18 +22,18 @@ type X        = Double
 type Y        = Double
 type Distance = Int
 type Pos      = (X, Y)
-data PosList  = PosList [Pos]          deriving (Show, Generic, Typeable)
+data Poslist  = Poslist [Pos]          deriving (Show, Generic, Typeable)
 
 -------------------------------------------------------------------------------
 
-$(derive makeBinary ''PosList)
+$(derive makeBinary ''Poslist)
 
-$(deriveJSON hiveJSONOptions ''PosList)
+$(deriveJSON hiveJSONOptions ''Poslist)
 
 -------------------------------------------------------------------------------
 
-convertToGraph :: PosList -> Graph Int
-convertToGraph (PosList pl) =
+convertToGraph :: Poslist -> Graph Int
+convertToGraph (Poslist pl) =
   let pss = zip [1..] . map (zip [1..] . zipWith dist pl . repeat) $ pl
   in  foldr' (\(f, ts) g -> foldr' (\(t, d) g' -> addEdge g' (f, t, d)) g ts) mkEmptyGraph pss
     where
@@ -41,5 +42,5 @@ convertToGraph (PosList pl) =
 
 -------------------------------------------------------------------------------
 
-parse :: Text -> Maybe PosList
+parse :: Text -> Maybe Poslist
 parse = decode' . encodeUtf8

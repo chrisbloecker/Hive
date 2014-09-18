@@ -3,6 +3,7 @@
 module Hive.Problem.Arithmetic
   ( __remoteTable
   , Expr (..)
+  , parse
   , interpret
   ) where
 
@@ -30,6 +31,9 @@ data Expr = Val Int
 $(deriveJSON hiveJSONOptions ''Expr)
 
 -------------------------------------------------------------------------------
+
+parse :: Text -> Maybe Expr
+parse = decode' . encodeUtf8
 
 eval :: Expr -> Int
 eval (Val i) = i

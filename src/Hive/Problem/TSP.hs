@@ -1,7 +1,8 @@
 {-# LANGUAGE TemplateHaskell, RecordWildCards, DeriveGeneric, DeriveDataTypeable #-}
 
 module Hive.Problem.TSP
-  ( __remoteTable
+  ( Configuration
+  , __remoteTable
   , interpret
   , mkConfiguration
   ) where
