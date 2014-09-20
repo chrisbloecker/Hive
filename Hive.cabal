@@ -47,6 +47,7 @@ library
                        Hive.RemoteTable
                        Hive.Interface
   other-modules:       Hive.Process
+                       Hive.Data.Queue
                        Hive.Data.Graph
                        Hive.Data.Poslist
                        Hive.Master.Messaging

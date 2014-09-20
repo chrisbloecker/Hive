@@ -24,13 +24,15 @@ import Data.Map  (Map)
 import Data.Acid (AcidState)
 
 import Hive.Types hiding (Entry(ticket))
+import Hive.Data.Queue        (Queue)
 import Hive.Master.Persistent (Database)
 
-import qualified Data.Map as M (empty, lookup, insert, delete)
+import qualified Data.Map        as M (empty, lookup, insert, delete)
+import qualified Hive.Data.Queue as Q
 
 -------------------------------------------------------------------------------
 
-data State = State { nodes  :: ![NodeId]
+data State = State { nodes  :: !(Queue NodeId)
                    , ticket :: !Ticket
                    , active :: !(Map ProcessId (Ticket, MonitorRef))
                    , db     :: !(AcidState Database)
@@ -39,22 +41,22 @@ data State = State { nodes  :: ![NodeId]
 -------------------------------------------------------------------------------
 
 initState :: Ticket -> (AcidState Database) -> State
-initState t db = State [] t M.empty db
+initState t db = State Q.mkEmpty t M.empty db
 
 insertNode :: NodeId -> State -> State
-insertNode n s@(State {..}) = s { nodes = n:nodes }
+insertNode n s@(State {..}) = s { nodes = Q.insert n nodes }
 
 removeNode :: NodeId -> State -> State
-removeNode n s@(State {..}) = s { nodes = filter (/= n) nodes }
+removeNode n s@(State {..}) = s { nodes = Q.remove n nodes }
 
 nodeCount :: State -> Int
-nodeCount (State {..}) = length nodes
+nodeCount (State {..}) = Q.size nodes
 
 peakNode :: State -> NodeId
-peakNode (State {..}) = head nodes
+peakNode (State {..}) = fst . Q.peak $ nodes
 
 tailNodes :: State -> State
-tailNodes s@(State {..}) = s { nodes = tail nodes }
+tailNodes s@(State {..}) = s { nodes = snd . Q.peak $ nodes }
 
 getTicket :: State -> Ticket
 getTicket (State {..}) = ticket
