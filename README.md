@@ -3,20 +3,20 @@ Hive
 
 How to build:
 
-1. clone the repo
-2. init a sandbox:
+- clone the repo
+- init a sandbox:
 ```
 cabal sandbox init
 ```
-3. install dependencies:
+- install dependencies:
 ```
 cabal install --only-dependencies
 ```
-4. configure the project:
+- configure the project:
 ```
 cabal configure
 ```
-5. install into the sandboy:
+- install into the sandboy:
 ```
 cabal install
 ```
