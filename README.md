@@ -11,7 +11,7 @@ When developing parallel algorithms, there is usually a lot of boilerplate code 
 
 This is a simplified example, however it shows the idea behind Hive:
 
-Let **f1**, **f2**, **f3** and **g** be functions. Let **Simple** be a process constructor that takes a function and wraps it into a process. Let **Sequence** and **Parallel** be process combinators that combine two processes into one. Let **runProcess** be an interpreter function that runs processes on an input. Let **x** be an input.
+Let **f1**, **f2**, **f3** and **g** be functions. Let **Simple** be a process constructor that takes a function and wraps it into a process. Let **Sequence** and **Parallel** be process combinators that combines two processes into one. Let **runProcess** be an interpreter function that runs processes on an input. Let **x** be an input.
 
 Assuming you want to wrap the given functions into processes, you would write something like
 
