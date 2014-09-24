@@ -1,7 +1,7 @@
 {-# LANGUAGE TemplateHaskell, DeriveGeneric, DeriveDataTypeable #-}
 
 module Hive.Types
-  ( Timeout (unTimeout)
+  ( Timeout (..)
   , milliseconds, seconds, minutes, hours
   , Host
   , Port
@@ -9,8 +9,8 @@ module Hive.Types
   , Time (..)
   , mkTime
   , diffTime
-  , Ticket (unTicket)
-  , Entry (ticket, problem, solution, startTime, endTime)
+  , Ticket (..)
+  , Entry (..)
   , mkEntry
   , History
   , mkTicket

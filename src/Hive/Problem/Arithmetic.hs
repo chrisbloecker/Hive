@@ -4,10 +4,24 @@ module Hive.Problem.Arithmetic
   ( __remoteTable
   , Expr (..)
   , parse
+  , eval
+  , val
+  , add
+  , subtract
+  , multiply
+  , divide
+  , intDict
+  , valProcess
+  , addProcess
+  , subtractProcess
+  , multiplyProcess
+  , divideProcess
   , interpret
   ) where
 
 -------------------------------------------------------------------------------
+
+import Prelude hiding (subtract)
 
 import Control.Distributed.Process.Closure      (mkClosure, mkStatic, remotable)
 import Control.Distributed.Process.Serializable (SerializableDict(SerializableDict))
@@ -21,20 +35,23 @@ import qualified Control.Distributed.Process as CH (Process)
 -- the data model
 -------------------------------------------------------------------------------
 
-data Expr = Val Int
-          | Add Expr Expr
-          | Sub Expr Expr
-          | Mul Expr Expr
-          | Div Expr Expr
+-- | Arithmetic expressions
+data Expr = Val Int -- ^ values
+          | Add Expr Expr -- ^ addition
+          | Sub Expr Expr -- ^ subtractions
+          | Mul Expr Expr -- ^ multiplications
+          | Div Expr Expr -- ^ division
   deriving (Eq, Show, Read)
 
 $(deriveJSON hiveJSONOptions ''Expr)
 
 -------------------------------------------------------------------------------
 
+-- | Reads a text and maybe procudes an expression
 parse :: Text -> Maybe Expr
 parse = decode' . encodeUtf8
 
+-- | Evaluates a given expression
 eval :: Expr -> Int
 eval (Val i) = i
 eval (Add x y) = eval x + eval y

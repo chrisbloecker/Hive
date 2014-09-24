@@ -1,9 +1,12 @@
 {-# LANGUAGE GADTs, TemplateHaskell #-}
 
--- | The core module of Hive
+-- | The core module of Hive.
+--
 -- In this module we define the constructors and combinators for the Hive process algebra and also the interpreter.
+--
+-- For example usage check out the "Hive.Problem.Arithmetic" module.
 module Hive.Process
-  ( Process
+  ( Process (..)
   , runProcess
   , mkConst
   , mkSimple
