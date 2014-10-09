@@ -36,12 +36,18 @@ type Host    = String
 type Port    = String
 type History = [Entry]
 
+-- | Wraps an Int that represents an amount of microseconds
 newtype Timeout = Timeout { unTimeout :: Int } deriving (Eq, Show)
+
+-- | A ticket is assigned to every new solve request to the system
 newtype Ticket  = Ticket  { unTicket  :: Int } deriving (Eq, Ord, Data, Generic, Typeable)
+
+-- | A master wraps a Cloud Haskell 'Control.Distributed.Process.ProcessId'
 newtype Master  = Master ProcessId deriving (Eq, Generic, Typeable)
 
 data Time = Time { getday :: Integer, getseconds :: Integer } deriving (Eq, Ord, Data, Generic, Typeable)
 
+-- | An entry holds all the information relevant for a solve request
 data Entry = Entry { ticket    :: Ticket
                    , problem   :: Problem
                    , solution  :: Maybe Solution

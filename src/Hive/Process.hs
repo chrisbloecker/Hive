@@ -30,7 +30,7 @@ import Control.Concurrent.MVar (MVar, newEmptyMVar, takeMVar, putMVar)
 import Control.Distributed.Process              (liftIO, getSelfPid, call, spawnLocal)
 import Control.Distributed.Process.Serializable (Serializable, SerializableDict)
 
-import qualified Control.Distributed.Process      as CH (Process, Closure, Static)
+import qualified Control.Distributed.Process as CH (Process, Closure, Static)
 
 -------------------------------------------------------------------------------
 
@@ -48,7 +48,7 @@ data Process a b where
   -- Execute two processes sequentially
   Sequence :: (Serializable b, Serializable c) => Process a c -> Process c b -> Process a b
   -- Execute two processes in parallel and combine the results
-  Parallel :: (Serializable b) => Process a b -> Process a b -> Process (b, b) b -> Process a b
+  Parallel :: (Serializable b, Serializable c, Serializable d) => Process a c -> Process a d -> Process (c, d) b -> Process a b
   -- Execute a list of processes in parallel and fold the results together
   Multilel :: (Serializable b, Serializable c) => [Process a c] -> b -> Process (b, [c]) b -> Process a b
   -- Repeat the execution of a process, like in a loop, as long as a given predicate holds.
@@ -79,7 +79,7 @@ mkSequence :: (Serializable b, Serializable c) => Process a c -> Process c b -> 
 mkSequence = Sequence
 
 -- | Exported function to run two processes in parallel
-mkParallel :: (Serializable b) => Process a b -> Process a b -> Process (b, b) b -> Process a b
+mkParallel :: (Serializable b, Serializable c, Serializable d) => Process a c -> Process a d -> Process (c, d) b -> Process a b
 mkParallel = Parallel
 
 -- | Exported function to run a list of processes in parallel and fold their outputs together
