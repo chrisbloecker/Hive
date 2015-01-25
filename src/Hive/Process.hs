@@ -1,4 +1,4 @@
-{-# LANGUAGE GADTs, TemplateHaskell #-}
+{-# LANGUAGE GADTs #-}
 
 -- | The core module of Hive.
 --
@@ -17,12 +17,18 @@ module Hive.Process
   , mkMultilel
   , mkLoop
   , mkSimpleLoop
+  , (>>)
+  , (||)
   ) where
 
 -------------------------------------------------------------------------------
 
+import Prelude hiding ((>>), (||))
+
 import Hive.Types            (Master)
 import Hive.Master.Messaging (getNode, returnNode, getFakeMaster, terminateMaster)
+
+import Data.Monoid
 
 import Control.Monad           (forM)
 import Control.Concurrent.MVar (MVar, newEmptyMVar, takeMVar, putMVar)
@@ -44,7 +50,7 @@ data Process a b where
   Local    :: (Serializable b) => Process a b -> Process a b
   -- A choice between two processes, based on the input value and another value that are combined into one value.
   -- This combinator inspects the input value and therefore cannot be an arrow.
-  Choice   :: (Serializable b) => c -> (a -> c -> c) -> (c -> Bool) -> Process a b -> Process a b -> Process a b
+  Choice   :: (Serializable b) => c -> (a -> c -> d) -> (d -> Bool) -> Process a b -> Process a b -> Process a b
   -- Execute two processes sequentially
   Sequence :: (Serializable b, Serializable c) => Process a c -> Process c b -> Process a b
   -- Execute two processes in parallel and combine the results
@@ -55,6 +61,23 @@ data Process a b where
   -- Unlike in imperative programming, we need a value that will be returned in case the predicate doesn't hold. In imperative programming this is represented implicitly by a (global) state.
   -- This combinator inspects the input value and therefore cannot be an arrow.
   Loop     :: (Serializable b) => b -> c -> (c -> Bool) -> (b -> a) -> (a -> c -> c) -> Process a b -> Process a b
+
+
+instance Show (Process a b) where
+  show (Const  _ _           ) = "Const _"
+  show (Simple _ _           ) = "Simple _"
+  show (Local          p     )  = "Local (" ++ show p ++ ")"
+  show (Choice _ _ _   p q   ) = "Choice (" ++ show p ++ " v " ++ show q ++ ")"
+  show (Sequence       p q   ) = "Sequence (" ++ show p ++ " > " ++ show q ++ ")"
+  show (Parallel       p q  r) = "Parallel (" ++ show p ++ " | " ++ show q ++ " -> " ++ show r ++ ")"
+  show (Multilel       ps _ r) = "Multilel (" ++ concatMap show ps ++ " => " ++ show r ++ ")"
+  show (Loop _ _ _ _ _ p     ) = "Loop (" ++ show p ++ ")"
+
+
+-- | Input for running processes
+data ProcessInput a where
+  LocalData  :: a -> ProcessInput a
+  RemoteData :: Int -> ProcessInput a
 
 -------------------------------------------------------------------------------
 
@@ -71,7 +94,7 @@ mkLocal :: (Serializable b) => Process a b -> Process a b
 mkLocal = Local
 
 -- | Exported function to create a choice between two processes
-mkChoice :: (Serializable b) => c -> (a -> c -> c) -> (c -> Bool) -> Process a b -> Process a b -> Process a b
+mkChoice :: (Serializable b) => c -> (a -> c -> d) -> (d -> Bool) -> Process a b -> Process a b -> Process a b
 mkChoice = Choice
 
 -- | Exported function to run two processes sequentially
@@ -92,7 +115,19 @@ mkLoop = Loop
 
 -- | Exported function to create a simple loop
 mkSimpleLoop :: (Serializable b) => b -> (a -> Bool) -> (b -> a) -> Process a b -> Process a b
-mkSimpleLoop ib pr ba p = Loop ib undefined pr ba const p
+mkSimpleLoop ib pr ba = Loop ib undefined pr ba const
+
+-------------------------------------------------------------------------------
+-- some infix versions of the combinators
+-------------------------------------------------------------------------------
+
+-- | Sequence
+(>>) :: (Serializable b, Serializable c) => Process a c -> Process c b -> Process a b
+(>>) = Sequence
+
+-- | Parallel
+(||) :: (Serializable b, Monoid b) => Process a b -> Process a b -> Process a b
+p || q = Parallel p q undefined
 
 -------------------------------------------------------------------------------
 -- interpretation of Process structure
@@ -111,21 +146,21 @@ runProcess master (Simple sDict closureGen) x = do
   returnNode master node
   return res
 
-runProcess master (Local p) x = do
+runProcess _ (Local p) x = do
   fakeMaster <- getFakeMaster =<< getSelfPid
   res <- runProcess fakeMaster p x
   terminateMaster fakeMaster
   return res
 
-runProcess master (Choice c acc p p1 p2) x =
-  runProcess master (if p (acc x c) then p1 else p2) x
+runProcess master (Choice c acd p p1 p2) x =
+  runProcess master (if p (acd x c) then p1 else p2) x
 
 runProcess master (Sequence p1 p2) x =
   runProcess master p1 x >>= runProcess master p2
 
 runProcess master (Parallel p1 p2 combinator) x = do
   mvar <- liftIO newEmptyMVar
-  spawnLocal $ runProcessHelper master p1 x mvar
+  _  <- spawnLocal $ runProcessHelper master p1 x mvar
   r2 <- runProcess master p2 x
   r1 <- liftIO $ takeMVar mvar
   runProcess master combinator (r1, r2)
@@ -133,7 +168,7 @@ runProcess master (Parallel p1 p2 combinator) x = do
 runProcess master (Multilel ps ib fold) x = do
   mvars <- forM ps $ \_ -> liftIO newEmptyMVar
   mapM_ (\(proc,mvar) -> spawnLocal $ runProcessHelper master proc x mvar) (ps `zip` mvars)
-  ress  <- forM mvars $ \m -> (liftIO . takeMVar $ m)
+  ress  <- forM mvars $ \m -> liftIO . takeMVar $ m
   runProcess master fold (ib, ress)
 
 runProcess master (Loop ib ic pr ba acc p) x =
@@ -151,8 +186,3 @@ runProcessHelper :: Master -> Process a b -> a -> MVar b -> CH.Process ()
 runProcessHelper master p x mvar = do
   r <- runProcess master p x
   liftIO $ putMVar mvar r
-
--- | Split lists into chunks of a given size.
-split :: Int -> [a] -> [[a]]
-split _ [] = []
-split i  l = take i l : split i (drop i l)
