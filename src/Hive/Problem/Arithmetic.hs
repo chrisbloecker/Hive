@@ -128,7 +128,7 @@ remotable ['val, 'add, 'subtract, 'multiply, 'divide, 'intDict]
 -- | Takes an Int and creates a Hive process which returns this Int based on 'val'
 --
 -- > valProcess i = mkConst $(mkStatic 'intDict) ($(mkClosure 'val) i)
-valProcess :: Int -> Process Int Int
+valProcess :: Int -> Process () Int
 valProcess i = mkConst $(mkStatic 'intDict) ($(mkClosure 'val) i)
 
 -- | Creates a Hive process that expects a pair of Ints and adds them, based on 'add'
@@ -161,7 +161,7 @@ divideProcess = mkSimple $(mkStatic 'intDict) $(mkClosure 'divide)
 
 -- | The interpreter for 'Expr'. It translates a given 'Expr' into a Hive process and exploits the fact
 -- that for any operation the operands can be computed in parallel.
-interpret :: Expr -> Process Int Int
+interpret :: Expr -> Process () Int
 interpret (Val i)   = valProcess i
 interpret (Add x y) = mkParallel (interpret x) (interpret y) addProcess
 interpret (Sub x y) = mkParallel (interpret x) (interpret y) subtractProcess

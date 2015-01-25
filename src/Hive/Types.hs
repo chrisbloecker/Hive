@@ -26,6 +26,7 @@ import Data.Time.Clock
 import Data.Time.Calendar
 
 import Hive.Imports.MkBinary
+import Hive.Imports.DeriveJSON
 import Hive.Problem.Types
 
 import Control.Distributed.Process (ProcessId)
@@ -72,6 +73,11 @@ instance Binary Master where
 instance Binary Entry where
 instance Binary Ticket where
 instance Binary Time where
+
+$(deriveJSON hiveJSONOptions ''Ticket)
+$(deriveJSON hiveJSONOptions ''Solution)
+$(deriveJSON hiveJSONOptions ''Time)
+$(deriveJSON hiveJSONOptions ''Entry)
 
 -------------------------------------------------------------------------------
 

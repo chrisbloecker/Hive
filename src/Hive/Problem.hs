@@ -23,17 +23,17 @@ import qualified Hive.Problem.TSP        as TSP
 handle :: Problem -> Master -> CH.Process Solution
 handle (Problem ARITH inst) master =
   maybe (return InvalidInput)
-        (\expr -> return . Solution . pack . show =<< runProcess master (Arithmetic.interpret expr) 0)
+        (\expr -> return . Solution . pack . show =<< runProcess master (Arithmetic.interpret expr) ())
         (Arithmetic.parse inst)
 
-handle (Problem TSP inst) master = do
+handle (Problem TSP inst) master =
   case Hive.Data.Graph.parse inst of
     Nothing -> return InvalidInput
     Just graph -> do
       let configuration = TSP.mkConfiguration graph 
                                               (mkPheromones graph 2)
                                               (nodes graph)
-                                              (round . (*10) . (/(log 10)) . log . fromIntegral . size $ graph)
+                                              (round . (*10) . (/log 10) . log . fromIntegral . size $ graph)
                                               (size graph)
                                               3
                                               5

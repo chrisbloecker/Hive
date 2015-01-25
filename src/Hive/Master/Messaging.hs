@@ -50,6 +50,9 @@ instance Binary ReplyLatestTicket where
 data Terminate = Terminate deriving (Generic, Typeable)
 instance Binary Terminate where
 
+data DeleteHistory = DeleteHistory deriving (Generic, Typeable)
+instance Binary DeleteHistory where
+
 -------------------------------------------------------------------------------
 
 nodeUp :: Master -> NodeId -> Int -> Process ()
@@ -110,3 +113,6 @@ requestLatestTicket (Master master) = do
 
 replyLatestTicket :: ProcessId -> Ticket -> Process ()
 replyLatestTicket pid ticket = send pid (ReplyLatestTicket ticket)
+
+deleteHistory :: Master -> Process ()
+deleteHistory (Master master) = send master DeleteHistory

@@ -56,7 +56,7 @@ mkConfiguration = Configuration
 -------------------------------------------------------------------------------
 
 ant :: Configuration -> CH.Process Path
-ant conf@(Configuration {..}) = do
+ant Configuration {..} = do
   say "Ant running..."
   runAnt graph pheromones [1] (nodes graph \\ [1])
   where
@@ -107,6 +107,6 @@ extractSolutionProcess = mkSimple $(mkStatic 'pathDict) $(mkClosure 'extractSolu
 
 interpret :: Configuration -> Process Configuration Path
 interpret conf@(Configuration {..}) = do
-  let innerProc = mkMultilel (take ants . repeat $ antProcess) conf (mkLocal combinePathsProcess)
-  let loop      = mkLoop conf 0 (<iterations) id (\_ i -> i+1) innerProc
+  let innerProc = mkMultilel (replicate ants antProcess) conf (mkLocal combinePathsProcess)
+      loop      = mkLoop conf 0 (<iterations) id (\_ i -> i+1) innerProc
   mkSequence loop extractSolutionProcess

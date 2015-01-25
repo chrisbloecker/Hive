@@ -8,6 +8,7 @@ module Hive.Master
   , request
   , requestHistory
   , requestLatestTicket
+  , deleteHistory
   , getNode
   , __remoteTable
   ) where
@@ -128,6 +129,11 @@ runMaster = do
                      , match $ \(RequestLatestTicket pid) -> do
                          replyLatestTicket pid (mkTicket . flip (-) 1 . unTicket $ ticket)
                          loop state
+
+                     , match $ \DeleteHistory -> do
+                        update' db ResetHistory
+                        loop . setTicket (mkTicket 0)
+                             $ state
 
                      , match $ \(ProcessMonitorNotification _monitorRef process diedReason) -> do
                         say $ "Process died: " ++ show process ++ ", reason: " ++ show diedReason

@@ -2,6 +2,7 @@ module Hive.Client
   ( solveRequest
   , getHistory
   , getLatestTicket
+  , clearHistory
   ) where
 
 -------------------------------------------------------------------------------
@@ -46,4 +47,14 @@ getLatestTicket masterHost masterPort mvar = do
       liftIO . putStrLn $ "Master found at " ++ show master
       latestTicket <- requestLatestTicket master
       liftIO $ putMVar mvar latestTicket
+      return ()
+
+clearHistory :: Host -> Port -> Process ()
+clearHistory masterHost masterPort = do
+  mMaster <- findMaster masterHost masterPort (milliseconds 500)
+  case mMaster of
+    Nothing -> error "No master found... Terminating..."
+    Just master -> do
+      liftIO . putStrLn $ "Master found at " ++ show master
+      deleteHistory master
       return ()

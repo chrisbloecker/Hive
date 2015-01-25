@@ -81,6 +81,11 @@ getHistory fromTicket toTicket = do
   Database{..} <- R.ask
   return . toDescList (Proxy :: Proxy Ticket) $ entries @>= fromTicket @<= toTicket
 
+resetHistory :: Update Database ()
+resetHistory = do
+  db@Database{..} <- ST.get
+  ST.put $ initDatabase
+
 -------------------------------------------------------------------------------
 
 makeAcidic ''Database [ 'getTicketSeq
@@ -89,4 +94,5 @@ makeAcidic ''Database [ 'getTicketSeq
                       , 'updateEntry
                       , 'getEntry
                       , 'getHistory
+                      , 'resetHistory
                       ]
