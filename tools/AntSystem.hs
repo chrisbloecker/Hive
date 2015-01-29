@@ -5,10 +5,11 @@ module Main
 
 -------------------------------------------------------------------------------
 
+import           Data.Function            (on)
 import           System.Environment       (getArgs)
 import           Control.Arrow            ((&&&), second)
 import           System.Random            (randomRIO)
-import           Data.List                ((\\))
+import           Data.List                ((\\), minimumBy)
 import           Data.Maybe               (fromMaybe, isJust)
 import           Graph
 import qualified Poslist             as P
@@ -18,50 +19,72 @@ import           Control.Concurrent       (forkIO)
 import           Control.Concurrent.MVar
 import           Control.Monad            (forM)
 
+import           Computation
+
 -------------------------------------------------------------------------------
 
-data Configuration = Configuration { graph      :: Graph Int
+data Configuration = Configuration { graph      :: !(Graph Int)
                                    , pheromones :: !Pheromones
                                    , path       :: !Path
-                                   , ants       :: Ants
-                                   , iterations :: Iterations
-                                   , alpha      :: Alpha
-                                   , beta       :: Beta
+                                   , pathLen    :: !Int
+                                   , ants       :: !Ants
+                                   , iterations :: !Iterations
+                                   , alpha      :: !Alpha
+                                   , beta       :: !Beta
+                                   , rho        :: !Rho
                                    }
 
 type Ants       = Int
 type Iterations = Int
 type Alpha      = Double
 type Beta       = Double
+type Rho        = Double
 type Visited    = [Node]
 type Unvisited  = [Node]
+type AntSolution = (Path, Int)
 
 -------------------------------------------------------------------------------
 
-ant :: Configuration -> MVar Path -> IO ()
-ant conf@(Configuration {..}) = runAnt graph pheromones [1] (nodes graph \\ [1])
-  where
-    runAnt :: Graph Int -> Pheromones -> Visited -> Unvisited -> MVar Path -> IO ()
-    runAnt _ _ visited        [] mvar = putMVar mvar visited >> return ()
-    runAnt g p visited unvisited mvar = do
-      let tau   = distance' p (last visited)
-      let eta   = (1.0/) . fromIntegral . distance' g (last visited)
-      let probs = [tau u**alpha * eta u**beta | u <- unvisited]
-      rand <- randomRIO (0, sum probs)
-      let next  = fst . head . dropWhile ((< rand) . snd) $ zip unvisited (scanl1 (+) probs)
-      runAnt g p (visited ++ [next]) (unvisited \\ [next]) mvar
+ant :: Configuration -> IO AntSolution
+ant conf@(Configuration {..}) = do
+  path <- runAnt graph pheromones [1] (nodes graph \\ [1])
+  return (path, pathLength' graph path)
+    where
+      runAnt :: Graph Int -> Pheromones -> Visited -> Unvisited -> IO Path
+      runAnt _ _ visited        [] = return visited
+      runAnt g p visited unvisited = do
+        let tau   = distance' p (last visited)
+        let eta   = (1.0/) . fromIntegral . distance' g (last visited)
+        let probs = [tau u**alpha * eta u**beta | u <- unvisited]
+        rand <- randomRIO (0, sum probs)
+        let next  = fst . head . dropWhile ((< rand) . snd) $ zip unvisited (scanl1 (+) probs)
+        runAnt g p (visited ++ [next]) (unvisited \\ [next])
 
-combinePaths :: Configuration -> [Path] -> Configuration
-combinePaths conf@Configuration{..} ps = conf { pheromones = pheromones', path = path' }
+combinePaths :: (Configuration, [AntSolution]) -> IO Configuration
+combinePaths (conf@(Configuration {..}), ps) = return conf { pheromones = pheromones', path = path', pathLen = len' }
   where
-    pheromones' = depositPheromones ( map (second (fromMaybe undefined))
-                                    . filter (isJust . snd)
-                                    . map (id &&& pathLength graph)
-                                    $ ps) pheromones
-    path'       = foldr (shorterPath graph) path ps
+    pheromones'   = depositPheromones ps pheromones
+    (path', len') = minimumBy (compare `on` snd) ps
 
-extractSolution :: Configuration -> Path
-extractSolution (Configuration {..}) = path
+evaporations :: Configuration -> IO Configuration
+evaporations (conf@Configuration {..}) = return conf { pheromones = evaporation rho pheromones }
+
+extractSolution :: Configuration -> IO AntSolution
+extractSolution (Configuration {..}) = return (path, pathLen)
+
+-------------------------------------------------------------------------------
+
+antC :: Computation Configuration AntSolution
+antC = Simple ant
+
+combinePathsC :: Computation (Configuration, [AntSolution]) Configuration
+combinePathsC = Simple combinePaths
+
+evaporationsC :: Computation Configuration Configuration
+evaporationsC = Simple evaporations
+
+extractSolutionC :: Computation Configuration AntSolution
+extractSolutionC = Simple extractSolution
 
 -------------------------------------------------------------------------------
 
@@ -77,16 +100,16 @@ main = do
       case mgraph of
         Nothing    -> print "the file didn't look good..."
         Just graph -> do
-          path <- solve (Configuration graph (mkPheromones graph 20) (nodes graph) (length . nodes $ graph) 100 2 5)
-          print (pathLength' graph path , path)
+          let conf        = Configuration graph (mkPheromones graph 2) (nodes graph) (pathLength' graph $ nodes graph) (size graph) 100 2 5 0.1
+              computation = interpret conf
+          solution <- runComputation computation conf
+          print solution
 
     _ -> putStrLn "wrong args, give me one input file."
 
-solve :: Configuration -> IO Path
-solve (Configuration _ _ path _ 0 _ _) = return path
-solve conf@Configuration{..} = do
-  mvars <- forM [1..ants] (const newEmptyMVar)
-  mapM_ (\(a, mvar) -> forkIO $ a conf mvar) (repeat ant `zip` mvars)
-  newPaths <- forM mvars $ \m -> takeMVar m
-  let conf' = combinePaths conf newPaths
-  solve conf' { iterations = iterations - 1 }
+interpret :: Configuration -> Computation Configuration AntSolution
+interpret conf@Configuration{..} = do
+  let antRuns    = Multilel (replicate ants antC) conf combinePathsC
+      innerComp  = Sequence antRuns evaporationsC
+      loop       = Loop conf 0 (<iterations) id (\_ i -> i+1) innerComp
+  Sequence loop extractSolutionC
