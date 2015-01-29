@@ -93,14 +93,16 @@ main = do
   args <- getArgs
 
   case args of
-    [jsonFile] -> do
+    [jsonFile, antNumber, iterNumber] -> do
       fileContent <- T.readFile jsonFile
       let mposlist = P.parse fileContent
           mgraph   = maybe Nothing (Just . P.convertToGraph) mposlist
+          ants     = read antNumber :: Int
+          iters    = read iterNumber :: Int
       case mgraph of
         Nothing    -> print "the file didn't look good..."
         Just graph -> do
-          let conf        = Configuration graph (mkPheromones graph 2) (nodes graph) (pathLength' graph $ nodes graph) (size graph) 100 2 5 0.1
+          let conf        = Configuration graph (mkPheromones graph 2) (nodes graph) (pathLength' graph $ nodes graph) ants iters 2 5 0.1
               computation = interpret conf
           solution <- runComputation computation conf
           print solution
