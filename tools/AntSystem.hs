@@ -7,7 +7,7 @@ module Main
 
 import           Data.Function            (on)
 import           System.Environment       (getArgs)
-import           Control.Arrow            ((&&&), second)
+import           Control.Arrow            ((&&&))
 import           System.Random            (randomRIO)
 import           Data.List                ((\\), minimumBy)
 import           Data.Maybe               (fromMaybe, isJust)
@@ -18,8 +18,7 @@ import qualified Data.Text.Lazy.IO   as T (readFile)
 import           Control.Concurrent       (forkIO)
 import           Control.Concurrent.MVar
 import           Control.Monad            (forM)
-
-import           Computation
+import           Process
 
 -------------------------------------------------------------------------------
 
@@ -34,23 +33,24 @@ data Configuration = Configuration { graph      :: !(Graph Int)
                                    , rho        :: !Rho
                                    }
 
-type Ants       = Int
-type Iterations = Int
-type Alpha      = Double
-type Beta       = Double
-type Rho        = Double
-type Visited    = [Node]
-type Unvisited  = [Node]
+type Ants        = Int
+type Iterations  = Int
+type Alpha       = Double
+type Beta        = Double
+type Rho         = Double
+type Visited     = [Node]
+type Unvisited   = [Node]
 type AntSolution = (Path, Int)
 
 -------------------------------------------------------------------------------
+-- basic processes
 
-ant :: Configuration -> IO AntSolution
-ant conf@(Configuration {..}) = do
+ant :: Configuration -> BasicProcess AntSolution
+ant Configuration {..} = do
   path <- runAnt graph pheromones [1] (nodes graph \\ [1])
   return (path, pathLength' graph path)
     where
-      runAnt :: Graph Int -> Pheromones -> Visited -> Unvisited -> IO Path
+      runAnt :: Graph Int -> Pheromones -> Visited -> Unvisited -> BasicProcess Path
       runAnt _ _ visited        [] = return visited
       runAnt g p visited unvisited = do
         let tau   = distance' p (last visited)
@@ -60,31 +60,32 @@ ant conf@(Configuration {..}) = do
         let next  = fst . head . dropWhile ((< rand) . snd) $ zip unvisited (scanl1 (+) probs)
         runAnt g p (visited ++ [next]) (unvisited \\ [next])
 
-combinePaths :: (Configuration, [AntSolution]) -> IO Configuration
+combinePaths :: (Configuration, [AntSolution]) -> BasicProcess Configuration
 combinePaths (conf@(Configuration {..}), ps) = return conf { pheromones = pheromones', path = path', pathLen = len' }
   where
     pheromones'   = depositPheromones ps pheromones
     (path', len') = minimumBy (compare `on` snd) ps
 
-evaporations :: Configuration -> IO Configuration
+evaporations :: Configuration -> BasicProcess Configuration
 evaporations (conf@Configuration {..}) = return conf { pheromones = evaporation rho pheromones }
 
-extractSolution :: Configuration -> IO AntSolution
+extractSolution :: Configuration -> BasicProcess AntSolution
 extractSolution (Configuration {..}) = return (path, pathLen)
 
 -------------------------------------------------------------------------------
+--
 
-antC :: Computation Configuration AntSolution
-antC = Simple ant
+antProcess :: Process Configuration AntSolution
+antProcess = Simple ant
 
-combinePathsC :: Computation (Configuration, [AntSolution]) Configuration
-combinePathsC = Simple combinePaths
+combinePathsProcess :: Process (Configuration, [AntSolution]) Configuration
+combinePathsProcess = Simple combinePaths
 
-evaporationsC :: Computation Configuration Configuration
-evaporationsC = Simple evaporations
+evaporationProcess :: Process Configuration Configuration
+evaporationProcess = Simple evaporations
 
-extractSolutionC :: Computation Configuration AntSolution
-extractSolutionC = Simple extractSolution
+extractSolutionProcess :: Process Configuration AntSolution
+extractSolutionProcess = Simple extractSolution
 
 -------------------------------------------------------------------------------
 
@@ -96,7 +97,7 @@ main = do
     [jsonFile, antNumber, iterNumber] -> do
       fileContent <- T.readFile jsonFile
       let mposlist = P.parse fileContent
-          mgraph   = maybe Nothing (Just . P.convertToGraph) mposlist
+          mgraph   = fmap P.convertToGraph mposlist
           ants     = read antNumber :: Int
           iters    = read iterNumber :: Int
       case mgraph of
@@ -104,14 +105,14 @@ main = do
         Just graph -> do
           let conf        = Configuration graph (mkPheromones graph 2) (nodes graph) (pathLength' graph $ nodes graph) ants iters 2 5 0.1
               computation = interpret conf
-          solution <- runComputation computation conf
+          solution <- runProcess computation conf
           print solution
 
     _ -> putStrLn "wrong args, give me one input file."
 
-interpret :: Configuration -> Computation Configuration AntSolution
-interpret conf@Configuration{..} = do
-  let antRuns    = Multilel (replicate ants antC) conf combinePathsC
-      innerComp  = Sequence antRuns evaporationsC
-      loop       = Loop conf 0 (<iterations) id (\_ i -> i+1) innerComp
-  Sequence loop extractSolutionC
+interpret :: Configuration -> Process Configuration AntSolution
+interpret conf@Configuration {..} = do
+  let antRuns   = Multilel (replicate ants antProcess) conf combinePathsProcess
+      innerProc = Sequence antRuns evaporationProcess
+      loop      = Loop conf 0 (<iterations) id (\_ i -> i+1) innerProc
+  Sequence loop extractSolutionProcess
