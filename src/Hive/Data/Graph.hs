@@ -17,6 +17,7 @@ module Hive.Data.Graph
   , pathLength
   , pathLength'
   , shorterPath
+  , shorterPath'
   , partition
   , partitions
   , overlay
@@ -106,6 +107,9 @@ shorterPath g p1 p2 = shorterPath' ((id &&& pathLength g) p1) ((id &&& pathLengt
     shorterPath' (_,   Nothing) (p2', Just _ ) = p2'
     shorterPath' (p1', Just l1) (p2', Just l2) | l1 <= l2   = p1'
                                                | otherwise  = p2'
+
+shorterPath' :: (Ord a, Num a) => Graph a -> Path -> Path -> Path
+shorterPath' g p1 p2 = if (pathLength g p1) <= (pathLength g p2) then p1 else p2
 
 partition :: Num a =>  Graph a -> Node -> Node -> Graph a
 partition (Graph m) n0 n1 = Graph (M.filterWithKey (\k _ -> k <= n1 && k > n0) m)

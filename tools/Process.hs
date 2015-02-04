@@ -44,9 +44,9 @@ data Process a b where
   -- This combinator inspects the input value and therefore cannot be an arrow.
   Loop     :: b -> c -> Predicate c -> (b -> a) -> (a -> c -> c) -> Process a b -> Process a b
   -- Maybe we want to split the data, run different actions on them and combine the results?
-  Split    :: (a -> (a,a)) -> Process a c -> Process a d -> Process (c, d) b -> Process a b
+  Split    :: (a -> (c, d)) -> Process c e -> Process d f -> Process (e, f) b -> Process a b
   -- Or maybe we want to split the data into many pieces?
-  Slice    :: (a -> [a]) -> [Process a c] -> b -> Process (b, [c]) b -> Process a b
+  Slice    :: (a -> [c]) -> [Process c d] -> b -> Process (b, [d]) b -> Process a b
 
 -------------------------------------------------------------------------------
 -- interpretation of Process structure
@@ -68,18 +68,29 @@ runProcess (Choice c acd pr p1 p2) x =
 runProcess (Sequence p1 p2) x =
   runProcess p1 x >>= runProcess p2
 
+{-- 
 runProcess (Parallel p1 p2 combinator) x = do
   mvar <- newEmptyMVar
   _ <- forkIO $ runProcessHelper p1 x mvar
   r2 <- runProcess p2 x
   r1 <- takeMVar mvar
   runProcess combinator (r1, r2)
+--}
+{-- or alternatively: --}
+runProcess (Parallel p1 p2 combinator) x = do
+  runProcess (Split (\x -> (x,x)) p1 p2 combinator) x
+--}
 
+{--
 runProcess (Multilel ps ib fold) x = do
   mvars <- forM ps $ const newEmptyMVar
   mapM_ (\(comp, mvar) -> forkIO $ runProcessHelper comp x mvar) (ps `zip` mvars)
   ress  <- forM mvars takeMVar
   runProcess fold (ib, ress)
+--}
+{-- or alternatively: --}
+runProcess (Multilel ps ib fold) x = do
+  runProcess (Slice repeat ps ib fold) x
 
 runProcess (Loop ib ic pr ba acc p) x = do
   if pr (acc x ic) then do
@@ -98,7 +109,7 @@ runProcess (Split split p1 p2 combinator) x = do
 
 runProcess (Slice slice ps ib fold) x = do
   let pairs = ps `zip` slice x
-  mvars <- forM pairs $ const newEmptyMVar
+  mvars <- forM pairs (const newEmptyMVar)
   mapM_ (\((proc, x'), mvar) -> forkIO $ runProcessHelper proc x' mvar) (pairs `zip` mvars)
   ress  <- forM mvars $ \mvar -> takeMVar mvar
   runProcess fold (ib, ress)

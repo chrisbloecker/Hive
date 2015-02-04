@@ -28,6 +28,7 @@ library
                        hashmap,
                        process,
                        time,
+                       split,
                        distributed-process    == 0.5.1,
                        template-haskell       == 2.8.0.0,
                        network-transport,

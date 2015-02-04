@@ -9,7 +9,7 @@ module Hive.Problem.TSP.Pheromones
 
 import Data.Foldable (foldr')
 
-import Hive.Data.Graph (Graph, Path, mkEmptyGraph, size, addEdge, distance', overlay)
+import Hive.Data.Graph (Graph, Path, mkEmptyGraph, size, addEdge, distance', overlay, nodes, neighbours)
 
 -------------------------------------------------------------------------------
 
@@ -28,8 +28,8 @@ toPheromones rt v = foldr (\(f, t) p -> addEdge p (f, t, 1.0 / fromIntegral v)) 
 
 evaporation :: Double -> Pheromones -> Pheromones
 evaporation c p =
-  let ns = [1 .. (size p)]
-  in  foldr' (\from g' -> foldr' (\to g'' -> addEdge g'' (from, to, (1-c) * distance' p from to)) g' ns) (mkEmptyGraph :: Graph Double) ns
+  let ns = nodes p
+  in  foldr' (\from g' -> foldr' (\to g'' -> addEdge g'' (from, to, (1-c) * distance' p from to)) g' (neighbours p from)) (mkEmptyGraph :: Graph Double) ns
 
 depositPheromones :: [(Path, Int)] -> Pheromones -> Pheromones
 depositPheromones rts p = foldr' (overlay (+)) p (map (uncurry toPheromones) rts)

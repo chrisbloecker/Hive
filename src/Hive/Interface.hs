@@ -1,35 +1,19 @@
 module Hive.Interface
   ( Master
-  , Process
+  , Process (..)
+  , BasicProcess
   , Problem (Problem)
   , ProblemType (..)
   , Solution (..)
   , runProcess
-  , mkConst
-  , mkSimple
-  , mkLocal
-  , mkChoice
-  , mkSequence
-  , mkParallel
-  , mkMultilel
-  , mkLoop
-  , mkSimpleLoop
   ) where
 
 import Hive.Types ( Master
                   )
 
-import Hive.Process ( Process
+import Hive.Process ( Process (..)
+                    , BasicProcess
                     , runProcess
-                    , mkConst
-                    , mkSimple
-                    , mkLocal
-                    , mkChoice
-                    , mkSequence
-                    , mkParallel
-                    , mkMultilel
-                    , mkLoop
-                    , mkSimpleLoop
                     )
 
 import Hive.Problem.Types ( Problem (Problem)

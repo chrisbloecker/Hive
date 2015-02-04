@@ -30,13 +30,7 @@ handle (Problem TSP inst) master =
   case Hive.Data.Graph.parse inst of
     Nothing -> return InvalidInput
     Just graph -> do
-      let configuration = TSP.mkConfiguration graph 
-                                              (mkPheromones graph 2)
-                                              (nodes graph)
-                                              (round . (*10) . (/log 10) . log . fromIntegral . size $ graph)
-                                              (size graph)
-                                              3
-                                              5
+      let configuration = TSP.Configuration graph (mkPheromones graph 2) (nodes graph) (pathLength' graph (nodes graph)) 10 100 1 2 0.1
       let proc = TSP.interpret configuration
       return . Solution . pack . show =<< runProcess master proc configuration
 

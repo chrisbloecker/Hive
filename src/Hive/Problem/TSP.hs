@@ -1,10 +1,9 @@
 {-# LANGUAGE TemplateHaskell, RecordWildCards, DeriveGeneric, DeriveDataTypeable #-}
 
 module Hive.Problem.TSP
-  ( Configuration
+  ( Configuration (..)
   , __remoteTable
   , interpret
-  , mkConfiguration
   ) where
 
 -------------------------------------------------------------------------------
@@ -17,8 +16,10 @@ import Control.Distributed.Process.Serializable (SerializableDict(SerializableDi
 
 import System.Random (randomRIO)
 
-import Data.List     ((\\))
-import Data.Maybe    (fromMaybe, isJust)
+import Data.Function   (on)
+import Data.List       ((\\), minimumBy)
+import Data.List.Split (chunksOf)
+import Data.Maybe      (fromMaybe, isJust)
 
 import Hive.Interface
 import Hive.Imports.MkBinary
@@ -29,84 +30,90 @@ import qualified Control.Distributed.Process as CH (Process)
 
 -------------------------------------------------------------------------------
 
-data Configuration = Configuration { graph      :: Graph Int
+data Configuration = Configuration { graph      :: !(Graph Int)
                                    , pheromones :: !Pheromones
                                    , path       :: !Path
-                                   , ants       :: Ants
-                                   , iterations :: Iterations
-                                   , alpha      :: Alpha
-                                   , beta       :: Beta
+                                   , pathLen    :: !Int
+                                   , ants       :: !Ants
+                                   , iterations :: !Iterations
+                                   , alpha      :: !Alpha
+                                   , beta       :: !Beta
+                                   , rho        :: !Rho
                                    }
   deriving (Generic, Typeable)
 
 instance Binary Configuration where
 
-type Ants       = Int
-type Iterations = Int
-type Alpha      = Double
-type Beta       = Double
-type Visited    = [Node]
-type Unvisited  = [Node]
+type Ants        = Int
+type Iterations  = Int
+type Alpha       = Double
+type Beta        = Double
+type Rho         = Double
+type Visited     = [Node]
+type Unvisited   = [Node]
+type AntSolution = (Path, Int)
 
 -------------------------------------------------------------------------------
 
-mkConfiguration :: Graph Int -> Pheromones -> Path -> Ants -> Iterations -> Alpha -> Beta -> Configuration
-mkConfiguration = Configuration
-
--------------------------------------------------------------------------------
-
-ant :: Configuration -> CH.Process Path
+ant :: Configuration -> BasicProcess AntSolution
 ant Configuration {..} = do
-  say "Ant running..."
-  runAnt graph pheromones [1] (nodes graph \\ [1])
-  where
-    runAnt :: Graph Int -> Pheromones -> Visited -> Unvisited -> CH.Process Path
-    runAnt _ _ visited        [] = return visited
-    runAnt g p visited unvisited = do
-      let tau   = distance' p (last visited)
-      let eta   = (1.0/) . fromIntegral . distance' g (last visited)
-      let probs = [tau u**alpha * eta u**beta | u <- unvisited]
-      rand <- liftIO $ randomRIO (0, sum probs)
-      let next  = fst . head . dropWhile ((< rand) . snd) $ zip unvisited (scanl1 (+) probs)
-      runAnt g p (visited ++ [next]) (unvisited \\ [next])
+  path <- runAnt graph pheromones [1] (nodes graph \\ [1])
+  return (path, pathLength' graph path)
+    where
+      runAnt :: Graph Int -> Pheromones -> Visited -> Unvisited -> BasicProcess Path
+      runAnt _ _ visited        [] = return visited
+      runAnt g p visited unvisited = do
+        let tau   = distance' p (last visited)
+        let eta   = (1.0/) . fromIntegral . distance' g (last visited)
+        let probs = [tau u**alpha * eta u**beta | u <- unvisited]
+        rand <- liftIO $ randomRIO (0, sum probs)
+        let next  = fst . head . dropWhile ((< rand) . snd) $ zip unvisited (scanl1 (+) probs)
+        runAnt g p (visited ++ [next]) (unvisited \\ [next])
 
-combinePaths :: (Configuration, [Path]) -> CH.Process Configuration
-combinePaths (conf@(Configuration {..}), ps) = return conf { pheromones = pheromones', path = path' }
+combinePaths :: (Configuration, [AntSolution]) -> BasicProcess Configuration
+combinePaths (conf@(Configuration {..}), ass) = return conf { pheromones = pheromones', path = path', pathLen = len' }
   where
-    pheromones' = depositPheromones ( map (second (fromMaybe undefined))
-                                    . filter (isJust . snd)
-                                    . map (id &&& pathLength graph)
-                                    $ ps) pheromones
-    path'       = foldr (shorterPath graph) path ps
+    pheromones'   = depositPheromones ass pheromones
+    (path', len') = minimumBy (compare `on` snd) ass
 
-extractSolution :: Configuration -> CH.Process Path
+evaporations :: Configuration -> BasicProcess Configuration
+evaporations (conf@Configuration {..}) = return conf { pheromones = evaporation rho pheromones }
+
+extractSolution :: Configuration -> BasicProcess Path
 extractSolution (Configuration {..}) = return path
 
 pathDict :: SerializableDict Path
 pathDict = SerializableDict
+
+antSolutionDict :: SerializableDict AntSolution
+antSolutionDict = SerializableDict
 
 configurationDict :: SerializableDict Configuration
 configurationDict = SerializableDict
 
 -------------------------------------------------------------------------------
 
-remotable ['ant, 'combinePaths, 'extractSolution, 'pathDict, 'configurationDict]
+remotable ['ant, 'combinePaths, 'evaporations, 'extractSolution, 'pathDict, 'antSolutionDict, 'configurationDict]
 
 -------------------------------------------------------------------------------
 
-antProcess :: Process Configuration Path
-antProcess = mkSimple $(mkStatic 'pathDict) $(mkClosure 'ant)
+antProcess :: Process Configuration AntSolution
+antProcess = Simple $(mkStatic 'antSolutionDict) $(mkClosure 'ant)
 
-combinePathsProcess :: Process (Configuration, [Path]) Configuration
-combinePathsProcess = mkSimple $(mkStatic 'configurationDict) $(mkClosure 'combinePaths)
+combinePathsProcess :: Process (Configuration, [AntSolution]) Configuration
+combinePathsProcess = Simple $(mkStatic 'configurationDict) $(mkClosure 'combinePaths)
+
+evaporationProcess :: Process Configuration Configuration
+evaporationProcess = Simple $(mkStatic 'configurationDict) $(mkClosure 'evaporations)
 
 extractSolutionProcess :: Process Configuration Path
-extractSolutionProcess = mkSimple $(mkStatic 'pathDict) $(mkClosure 'extractSolution)
+extractSolutionProcess = Simple $(mkStatic 'pathDict) $(mkClosure 'extractSolution)
 
 -------------------------------------------------------------------------------
 
 interpret :: Configuration -> Process Configuration Path
-interpret conf@(Configuration {..}) = do
-  let innerProc = mkMultilel (replicate ants antProcess) conf (mkLocal combinePathsProcess)
-      loop      = mkLoop conf 0 (<iterations) id (\_ i -> i+1) innerProc
-  mkSequence loop extractSolutionProcess
+interpret conf@Configuration {..} = do
+  let antRuns   = Multilel (replicate ants antProcess) conf (Local combinePathsProcess)
+      innerProc = Sequence antRuns (Local evaporationProcess)
+      loop      = Loop conf 0 (<iterations) id (\_ i -> i+1) innerProc
+  Sequence loop (Local extractSolutionProcess)

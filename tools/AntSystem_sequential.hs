@@ -5,17 +5,17 @@ module Main
 
 -------------------------------------------------------------------------------
 
-import           Data.Function            (on)
-import           System.Environment       (getArgs)
-import           Control.Arrow            ((&&&))
-import           System.Random            (randomRIO)
-import           Data.List                ((\\), minimumBy)
-import           Data.Maybe               (fromMaybe, isJust)
+import           Data.Function          (on)
+import           System.Environment     (getArgs)
+import           Control.Arrow          ((&&&))
+import           System.Random          (randomRIO)
+import           Data.List              ((\\), minimumBy)
+import           Data.Maybe             (fromMaybe, isJust)
 import           Graph
-import qualified Poslist             as P
+import qualified Poslist           as P
 import           Pheromones
-import qualified Data.Text.Lazy.IO   as T (readFile)
-import           Control.Monad            (forM)
+import qualified Data.Text.Lazy.IO as T (readFile)
+import           Control.Monad          (forM)
 
 -------------------------------------------------------------------------------
 

@@ -129,31 +129,31 @@ remotable ['val, 'add, 'subtract, 'multiply, 'divide, 'intDict]
 --
 -- > valProcess i = mkConst $(mkStatic 'intDict) ($(mkClosure 'val) i)
 valProcess :: Int -> Process () Int
-valProcess i = mkConst $(mkStatic 'intDict) ($(mkClosure 'val) i)
+valProcess i = Const $(mkStatic 'intDict) ($(mkClosure 'val) i)
 
 -- | Creates a Hive process that expects a pair of Ints and adds them, based on 'add'
 --
 -- > addProcess = mkSimple $(mkStatic 'intDict) $(mkClosure 'add)
 addProcess :: Process (Int, Int) Int
-addProcess = mkSimple $(mkStatic 'intDict) $(mkClosure 'add)
+addProcess = Simple $(mkStatic 'intDict) $(mkClosure 'add)
 
 -- | Creates a Hive process that expects a pair of Ints and subtracts the second from the first, based on 'subtract'
 --
 -- > subtractProcess = mkSimple $(mkStatic 'intDict) $(mkClosure 'subtract)
 subtractProcess :: Process (Int, Int) Int
-subtractProcess = mkSimple $(mkStatic 'intDict) $(mkClosure 'subtract)
+subtractProcess = Simple $(mkStatic 'intDict) $(mkClosure 'subtract)
 
 -- | Creates a Hive process that expects a pair of Ints and multiplies them, based on 'multiply'
 --
 -- > multiplyProcess = mkSimple $(mkStatic 'intDict) $(mkClosure 'multiply)
 multiplyProcess :: Process (Int, Int) Int
-multiplyProcess = mkSimple $(mkStatic 'intDict) $(mkClosure 'multiply)
+multiplyProcess = Simple $(mkStatic 'intDict) $(mkClosure 'multiply)
 
 -- | Creates a Hive process that expects a pair of Ints and divides the first by the second, based on 'divide'
 --
 -- > divideProcess = mkSimple $(mkStatic 'intDict) $(mkClosure 'divide)
 divideProcess :: Process (Int, Int) Int
-divideProcess = mkSimple $(mkStatic 'intDict) $(mkClosure 'divide)
+divideProcess = Simple $(mkStatic 'intDict) $(mkClosure 'divide)
 
 -------------------------------------------------------------------------------
 -- interpretation of an Expr in form of a Process
@@ -163,7 +163,7 @@ divideProcess = mkSimple $(mkStatic 'intDict) $(mkClosure 'divide)
 -- that for any operation the operands can be computed in parallel.
 interpret :: Expr -> Process () Int
 interpret (Val i)   = valProcess i
-interpret (Add x y) = mkParallel (interpret x) (interpret y) addProcess
-interpret (Sub x y) = mkParallel (interpret x) (interpret y) subtractProcess
-interpret (Mul x y) = mkParallel (interpret x) (interpret y) multiplyProcess
-interpret (Div x y) = mkParallel (interpret x) (interpret y) divideProcess
+interpret (Add x y) = Parallel (interpret x) (interpret y) addProcess
+interpret (Sub x y) = Parallel (interpret x) (interpret y) subtractProcess
+interpret (Mul x y) = Parallel (interpret x) (interpret y) multiplyProcess
+interpret (Div x y) = Parallel (interpret x) (interpret y) divideProcess
