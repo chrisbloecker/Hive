@@ -79,8 +79,19 @@ combinePaths (conf@(Configuration {..}), ass) = return conf { pheromones = phero
 evaporations :: Configuration -> BasicProcess Configuration
 evaporations (conf@Configuration {..}) = return conf { pheromones = evaporation rho pheromones }
 
+iter :: Configuration -> BasicProcess Configuration
+iter conf@Configuration {..} = return conf { iterations = iterations - 1 }
+
+continueIter :: Configuration -> BasicProcess Bool
+continueIter Configuration {..} = return (iterations > 0)
+
 extractSolution :: Configuration -> BasicProcess Path
 extractSolution (Configuration {..}) = return path
+
+-------------------------------------------------------------------------------
+
+boolDict :: SerializableDict Bool
+boolDict = SerializableDict
 
 pathDict :: SerializableDict Path
 pathDict = SerializableDict
@@ -93,7 +104,17 @@ configurationDict = SerializableDict
 
 -------------------------------------------------------------------------------
 
-remotable ['ant, 'combinePaths, 'evaporations, 'extractSolution, 'pathDict, 'antSolutionDict, 'configurationDict]
+remotable ['ant
+          , 'combinePaths
+          , 'evaporations
+          , 'iter
+          , 'continueIter
+          , 'extractSolution
+          , 'boolDict
+          , 'pathDict
+          , 'antSolutionDict
+          , 'configurationDict
+          ]
 
 -------------------------------------------------------------------------------
 
@@ -106,6 +127,12 @@ combinePathsProcess = Simple $(mkStatic 'configurationDict) $(mkClosure 'combine
 evaporationProcess :: Process Configuration Configuration
 evaporationProcess = Simple $(mkStatic 'configurationDict) $(mkClosure 'evaporations)
 
+iterProcess :: Process Configuration Configuration
+iterProcess = Simple $(mkStatic 'configurationDict) $(mkClosure 'iter)
+
+continueIterProcess :: Predicate Configuration
+continueIterProcess = Simple $(mkStatic 'boolDict) $(mkClosure 'continueIter)
+
 extractSolutionProcess :: Process Configuration Path
 extractSolutionProcess = Simple $(mkStatic 'pathDict) $(mkClosure 'extractSolution)
 
@@ -113,7 +140,7 @@ extractSolutionProcess = Simple $(mkStatic 'pathDict) $(mkClosure 'extractSoluti
 
 interpret :: Configuration -> Process Configuration Path
 interpret conf@Configuration {..} = do
-  let antRuns   = Multilel (replicate ants antProcess) conf (Local combinePathsProcess)
-      innerProc = Sequence antRuns (Local evaporationProcess)
-      loop      = Loop conf 0 (<iterations) id (\_ i -> i+1) innerProc
+  let antRuns   = Multilel (replicate ants antProcess) Id (Local combinePathsProcess)
+      innerProc = antRuns `Sequence` Local evaporationProcess `Sequence` Local iterProcess
+      loop      = Repetition continueIterProcess innerProc
   Sequence loop (Local extractSolutionProcess)
