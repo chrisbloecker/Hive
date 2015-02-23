@@ -45,12 +45,12 @@ type AntSolution = (Path, Int)
 -------------------------------------------------------------------------------
 -- basic processes
 
-ant :: Configuration -> BasicProcess AntSolution
+ant :: BasicProcess Configuration AntSolution
 ant Configuration {..} = do
   path <- runAnt graph pheromones [1] (nodes graph \\ [1])
   return (path, pathLength' graph path)
     where
-      runAnt :: Graph Int -> Pheromones -> Visited -> Unvisited -> BasicProcess Path
+      runAnt :: Graph Int -> Pheromones -> Visited -> Unvisited -> IO Path
       runAnt _ _ visited        [] = return visited
       runAnt g p visited unvisited = do
         let tau   = distance' p (last visited)
@@ -60,32 +60,44 @@ ant Configuration {..} = do
         let next  = fst . head . dropWhile ((< rand) . snd) $ zip unvisited (scanl1 (+) probs)
         runAnt g p (visited ++ [next]) (unvisited \\ [next])
 
-combinePaths :: (Configuration, [AntSolution]) -> BasicProcess Configuration
+combinePaths :: BasicProcess (Configuration, [AntSolution]) Configuration
 combinePaths (conf@(Configuration {..}), ps) = return conf { pheromones = pheromones', path = path', pathLen = len' }
   where
     pheromones'   = depositPheromones ps pheromones
     (path', len') = minimumBy (compare `on` snd) ps
 
-evaporations :: Configuration -> BasicProcess Configuration
+evaporations :: BasicProcess Configuration Configuration
 evaporations (conf@Configuration {..}) = return conf { pheromones = evaporation rho pheromones }
 
-extractSolution :: Configuration -> BasicProcess AntSolution
+decIter :: BasicProcess Configuration Configuration
+decIter conf@Configuration {..} = return conf { iterations = iterations - 1 }
+
+continueIter :: BasicProcess Configuration Bool
+continueIter Configuration {..} = return (iterations > 0)
+
+extractSolution :: BasicProcess Configuration AntSolution
 extractSolution (Configuration {..}) = return (path, pathLen)
 
 -------------------------------------------------------------------------------
 --
 
 antProcess :: Process Configuration AntSolution
-antProcess = Simple ant
+antProcess = Basic ant
 
 combinePathsProcess :: Process (Configuration, [AntSolution]) Configuration
-combinePathsProcess = Simple combinePaths
+combinePathsProcess = Basic combinePaths
 
 evaporationProcess :: Process Configuration Configuration
-evaporationProcess = Simple evaporations
+evaporationProcess = Basic evaporations
+
+decIterProcess :: Process Configuration Configuration
+decIterProcess = Basic decIter
+
+continueIterProcess :: Predicate Configuration
+continueIterProcess = Basic continueIter
 
 extractSolutionProcess :: Process Configuration AntSolution
-extractSolutionProcess = Simple extractSolution
+extractSolutionProcess = Basic extractSolution
 
 -------------------------------------------------------------------------------
 
@@ -112,7 +124,7 @@ main = do
 
 interpret :: Configuration -> Process Configuration AntSolution
 interpret conf@Configuration {..} = do
-  let antRuns   = Multilel (replicate ants antProcess) conf combinePathsProcess
-      innerProc = Sequence antRuns evaporationProcess
-      loop      = Loop conf 0 (<iterations) id (\_ i -> i+1) innerProc
+  let antRuns   = Multilel (replicate ants antProcess) combinePathsProcess
+      innerProc = antRuns `Sequence` evaporationProcess `Sequence` decIterProcess
+      loop      = Repetition continueIterProcess innerProc
   Sequence loop extractSolutionProcess
